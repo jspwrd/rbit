@@ -6,6 +6,35 @@ use std::time::Duration;
 
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// An HTTP tracker client ([BEP-3]).
+///
+/// HTTP trackers use standard HTTP GET requests to announce presence and
+/// retrieve peer lists.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rbit::tracker::{HttpTracker, TrackerEvent};
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let tracker = HttpTracker::new("http://tracker.example.com/announce")?;
+///
+/// let response = tracker.announce(
+///     &[0u8; 20],           // info_hash
+///     &[0u8; 20],           // peer_id
+///     6881,                 // port
+///     0,                    // uploaded
+///     0,                    // downloaded
+///     1000,                 // left
+///     TrackerEvent::Started,
+/// ).await?;
+///
+/// println!("Found {} peers", response.peers.len());
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [BEP-3]: http://bittorrent.org/beps/bep_0003.html
 pub struct HttpTracker {
     client: Client,
     url: String,

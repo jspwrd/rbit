@@ -92,6 +92,31 @@ impl TokenSecrets {
     }
 }
 
+/// The main DHT server for peer discovery.
+///
+/// `DhtServer` implements the BitTorrent DHT protocol ([BEP-5]) for finding
+/// peers without relying on trackers.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rbit::dht::DhtServer;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// // Bind to a UDP port
+/// let dht = DhtServer::bind(6881).await?;
+///
+/// // Bootstrap from known nodes
+/// dht.bootstrap().await?;
+///
+/// // Find peers for a torrent
+/// let info_hash = [0u8; 20];
+/// let peers = dht.get_peers(info_hash).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [BEP-5]: http://bittorrent.org/beps/bep_0005.html
 pub struct DhtServer {
     socket: Arc<UdpSocket>,
     our_id: NodeId,

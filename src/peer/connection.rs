@@ -9,26 +9,66 @@ use std::net::SocketAddr;
 use std::time::Instant;
 use tokio::net::TcpStream;
 
+/// The connection state of a peer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeerState {
+    /// TCP connection in progress.
     Connecting,
+    /// Connected, performing BitTorrent handshake.
     Handshaking,
+    /// Fully connected and ready for data exchange.
     Connected,
+    /// Connection has been closed.
     Disconnected,
 }
 
+/// A connection to a BitTorrent peer.
+///
+/// Manages the TCP connection and protocol state for communicating with a
+/// single peer, including handshake, message exchange, and choking state.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rbit::peer::{PeerConnection, PeerId, Message};
+/// use std::net::SocketAddr;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let addr: SocketAddr = "192.168.1.100:6881".parse()?;
+/// let info_hash = [0u8; 20];
+/// let peer_id = PeerId::generate();
+///
+/// let mut conn = PeerConnection::connect(addr, info_hash, *peer_id.as_bytes()).await?;
+///
+/// // Express interest and wait for unchoke
+/// conn.send(Message::Interested).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct PeerConnection {
+    /// The peer's socket address.
     pub addr: SocketAddr,
+    /// The peer's ID (if received in handshake).
     pub peer_id: Option<PeerId>,
+    /// Current connection state.
     pub state: PeerState,
+    /// Choking state for this connection.
     pub choking: ChokingState,
+    /// The peer's bitfield (pieces they have).
     pub bitfield: Option<Bitfield>,
+    /// Extension handshake data (if BEP-10 is supported).
     pub extension_handshake: Option<ExtensionHandshake>,
+    /// Whether the peer supports the Fast Extension (BEP-6).
     pub supports_fast: bool,
+    /// Whether the peer supports the Extension Protocol (BEP-10).
     pub supports_extension: bool,
+    /// When the connection was established.
     pub connected_at: Instant,
+    /// When the last message was received.
     pub last_message_at: Instant,
+    /// Total bytes downloaded from this peer.
     pub bytes_downloaded: u64,
+    /// Total bytes uploaded to this peer.
     pub bytes_uploaded: u64,
     transport: Option<PeerTransport>,
 }
