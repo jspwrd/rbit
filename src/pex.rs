@@ -1,27 +1,80 @@
-//! Peer Exchange (BEP-11)
+//! Peer Exchange ([BEP-11]).
 //!
-//! This module implements Peer Exchange for sharing peer information
-//! between connected peers.
+//! Peer Exchange (PEX) allows connected peers to share information about
+//! other peers they know about, reducing reliance on trackers.
+//!
+//! # Overview
+//!
+//! PEX works via the extension protocol ([BEP-10]). Peers periodically exchange
+//! messages containing:
+//! - **added** - New peers to connect to
+//! - **dropped** - Peers that have disconnected
+//!
+//! # Examples
+//!
+//! ```
+//! use rbit::pex::{PexMessage, PexPeer, PexFlags};
+//! use std::net::SocketAddr;
+//!
+//! let mut msg = PexMessage::new();
+//!
+//! // Add a peer
+//! let peer = PexPeer::new("192.168.1.100:6881".parse().unwrap());
+//! msg.add_peer(peer);
+//!
+//! // Add a seeder with flags
+//! let seeder = PexPeer::with_flags(
+//!     "10.0.0.1:51413".parse().unwrap(),
+//!     PexFlags { seed: true, ..Default::default() }
+//! );
+//! msg.add_peer(seeder);
+//!
+//! // Encode for transmission
+//! let added = msg.encode_added();
+//! let flags = msg.encode_added_flags();
+//! ```
+//!
+//! # Peer Flags
+//!
+//! Each peer has optional flags indicating capabilities:
+//! - `encryption` - Supports encryption
+//! - `seed` - Is a seeder (has all pieces)
+//! - `utp` - Supports uTP protocol
+//! - `holepunch` - Supports NAT hole punching
+//! - `connectable` - Accepts incoming connections
+//!
+//! [BEP-10]: http://bittorrent.org/beps/bep_0010.html
+//! [BEP-11]: http://bittorrent.org/beps/bep_0011.html
 
 use bytes::{BufMut, Bytes, BytesMut};
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
+/// A peer discovered via Peer Exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PexPeer {
+    /// The peer's socket address.
     pub addr: SocketAddr,
+    /// Capability flags for this peer.
     pub flags: PexFlags,
 }
 
+/// Capability flags for a PEX peer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct PexFlags {
+    /// Peer supports encrypted connections.
     pub encryption: bool,
+    /// Peer is a seeder (has complete data).
     pub seed: bool,
+    /// Peer supports uTP (micro Transport Protocol).
     pub utp: bool,
+    /// Peer supports NAT hole punching.
     pub holepunch: bool,
+    /// Peer accepts incoming connections.
     pub connectable: bool,
 }
 
 impl PexFlags {
+    /// Decodes flags from a single byte.
     pub fn from_byte(b: u8) -> Self {
         Self {
             encryption: (b & 0x01) != 0,
@@ -32,6 +85,7 @@ impl PexFlags {
         }
     }
 
+    /// Encodes flags to a single byte.
     pub fn to_byte(self) -> u8 {
         let mut b = 0u8;
         if self.encryption {
@@ -53,11 +107,18 @@ impl PexFlags {
     }
 }
 
+/// A PEX message containing peer updates.
+///
+/// Messages track both IPv4 and IPv6 peers separately.
 #[derive(Debug, Clone, Default)]
 pub struct PexMessage {
+    /// IPv4 peers to add.
     pub added: Vec<PexPeer>,
+    /// IPv6 peers to add.
     pub added6: Vec<PexPeer>,
+    /// IPv4 peers that disconnected.
     pub dropped: Vec<SocketAddr>,
+    /// IPv6 peers that disconnected.
     pub dropped6: Vec<SocketAddr>,
 }
 

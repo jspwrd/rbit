@@ -2,16 +2,81 @@ use super::error::MetainfoError;
 use super::info_hash::InfoHash;
 use std::collections::HashMap;
 
+/// A parsed magnet link ([BEP-9]).
+///
+/// Magnet links allow sharing torrents without a `.torrent` file by encoding
+/// the info hash and optional metadata in a URI.
+///
+/// # Format
+///
+/// A magnet URI has the format:
+/// ```text
+/// magnet:?xt=urn:btih:<info-hash>&dn=<name>&tr=<tracker>...
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// use rbit::metainfo::MagnetLink;
+///
+/// let uri = "magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a\
+///            &dn=Example&tr=http%3A%2F%2Ftracker.example.com%2Fannounce";
+///
+/// let magnet = MagnetLink::parse(uri).unwrap();
+/// assert_eq!(magnet.display_name, Some("Example".to_string()));
+///
+/// // Convert back to URI
+/// let uri = magnet.to_uri();
+/// assert!(uri.starts_with("magnet:?xt=urn:btih:"));
+/// ```
+///
+/// [BEP-9]: http://bittorrent.org/beps/bep_0009.html
 #[derive(Debug, Clone)]
 pub struct MagnetLink {
+    /// The torrent's info hash (required).
     pub info_hash: InfoHash,
+    /// Suggested display name for the torrent.
     pub display_name: Option<String>,
+    /// Tracker URLs from the `tr` parameter.
     pub trackers: Vec<String>,
+    /// Web seed URLs from the `ws` parameter ([BEP-19](http://bittorrent.org/beps/bep_0019.html)).
     pub web_seeds: Vec<String>,
+    /// Peer addresses from the `x.pe` parameter.
     pub peer_addresses: Vec<String>,
 }
 
 impl MagnetLink {
+    /// Parses a magnet URI.
+    ///
+    /// # Supported Parameters
+    ///
+    /// - `xt` - Exact topic (info hash), required. Supports:
+    ///   - `urn:btih:<hex>` - v1 hex-encoded info hash (40 chars)
+    ///   - `urn:btih:<base32>` - v1 base32-encoded info hash (32 chars)
+    ///   - `urn:btmh:1220<hex>` - v2 hex-encoded info hash
+    /// - `dn` - Display name (URL-encoded)
+    /// - `tr` - Tracker URL (URL-encoded, can appear multiple times)
+    /// - `ws` - Web seed URL (URL-encoded, can appear multiple times)
+    /// - `x.pe` - Peer address (can appear multiple times)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MetainfoError::InvalidMagnetLink`] if:
+    /// - The URI doesn't start with `magnet:?`
+    /// - The `xt` parameter is missing
+    /// - The info hash format is not recognized
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rbit::metainfo::MagnetLink;
+    ///
+    /// let magnet = MagnetLink::parse(
+    ///     "magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a"
+    /// ).unwrap();
+    ///
+    /// assert!(magnet.info_hash.is_v1());
+    /// ```
     pub fn parse(uri: &str) -> Result<Self, MetainfoError> {
         if !uri.starts_with("magnet:?") {
             return Err(MetainfoError::InvalidMagnetLink(
@@ -76,6 +141,28 @@ impl MagnetLink {
         })
     }
 
+    /// Converts this magnet link back to a URI string.
+    ///
+    /// The output includes the info hash and any populated optional fields
+    /// (display name, trackers, web seeds).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rbit::metainfo::{MagnetLink, InfoHash};
+    ///
+    /// let magnet = MagnetLink {
+    ///     info_hash: InfoHash::from_hex("c12fe1c06bba254a9dc9f519b335aa7c1367a88a").unwrap(),
+    ///     display_name: Some("Example".to_string()),
+    ///     trackers: vec!["http://tracker.example.com/announce".to_string()],
+    ///     web_seeds: vec![],
+    ///     peer_addresses: vec![],
+    /// };
+    ///
+    /// let uri = magnet.to_uri();
+    /// assert!(uri.contains("xt=urn:btih:"));
+    /// assert!(uri.contains("dn=Example"));
+    /// ```
     pub fn to_uri(&self) -> String {
         let mut uri = String::from("magnet:?");
 

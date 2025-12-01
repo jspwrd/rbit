@@ -2,6 +2,45 @@ use super::error::BencodeError;
 use super::value::Value;
 use std::io::Write;
 
+/// Encodes a bencode value to a byte vector.
+///
+/// The output follows the canonical bencode format:
+/// - Integers: `i<number>e`
+/// - Byte strings: `<length>:<data>`
+/// - Lists: `l<items>e`
+/// - Dictionaries: `d<key><value>...e` (keys sorted lexicographically)
+///
+/// # Errors
+///
+/// Returns an error if writing to the internal buffer fails.
+///
+/// # Examples
+///
+/// ```
+/// use rbit::bencode::{encode, Value};
+/// use std::collections::BTreeMap;
+/// use bytes::Bytes;
+///
+/// // Encode an integer
+/// let encoded = encode(&Value::Integer(42)).unwrap();
+/// assert_eq!(encoded, b"i42e");
+///
+/// // Encode a string
+/// let encoded = encode(&Value::string("hello")).unwrap();
+/// assert_eq!(encoded, b"5:hello");
+///
+/// // Encode a list
+/// let list = Value::List(vec![Value::Integer(1), Value::string("two")]);
+/// let encoded = encode(&list).unwrap();
+/// assert_eq!(encoded, b"li1e3:twoe");
+///
+/// // Encode a dictionary
+/// let mut dict = BTreeMap::new();
+/// dict.insert(Bytes::from_static(b"a"), Value::Integer(1));
+/// dict.insert(Bytes::from_static(b"b"), Value::Integer(2));
+/// let encoded = encode(&Value::Dict(dict)).unwrap();
+/// assert_eq!(encoded, b"d1:ai1e1:bi2ee");
+/// ```
 pub fn encode(value: &Value) -> Result<Vec<u8>, BencodeError> {
     let mut buf = Vec::new();
     encode_value(value, &mut buf)?;

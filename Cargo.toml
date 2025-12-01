@@ -5,8 +5,15 @@ edition = "2024"
 description = "A BitTorrent library implementing BEP specifications"
 license = "MIT"
 repository = "https://github.com/jasper/rbit"
-keywords = ["bittorrent", "torrent", "p2p", "dht"]
-categories = ["network-programming"]
+documentation = "https://docs.rs/rbit"
+readme = "README.md"
+keywords = ["bittorrent", "torrent", "p2p", "dht", "peer-to-peer"]
+categories = ["network-programming", "asynchronous"]
+rust-version = "1.85"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Async runtime

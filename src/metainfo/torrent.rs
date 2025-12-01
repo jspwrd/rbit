@@ -6,36 +6,101 @@ use sha1::{Digest, Sha1};
 use sha2::Sha256;
 use std::path::PathBuf;
 
+/// A parsed torrent file.
+///
+/// Contains all metadata from a `.torrent` file, including file information,
+/// piece hashes, and tracker URLs.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rbit::metainfo::Metainfo;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let data = std::fs::read("example.torrent")?;
+/// let metainfo = Metainfo::from_bytes(&data)?;
+///
+/// println!("Torrent: {}", metainfo.info.name);
+/// println!("Size: {} bytes", metainfo.info.total_length);
+/// println!("Info hash: {}", metainfo.info_hash);
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Metainfo {
+    /// The info dictionary containing file and piece information.
     pub info: Info,
+    /// The unique identifier for this torrent (hash of the info dictionary).
     pub info_hash: InfoHash,
+    /// Primary tracker URL.
     pub announce: Option<String>,
+    /// Multi-tier tracker list ([BEP-12](http://bittorrent.org/beps/bep_0012.html)).
     pub announce_list: Vec<Vec<String>>,
+    /// Unix timestamp when the torrent was created.
     pub creation_date: Option<i64>,
+    /// Optional comment about the torrent.
     pub comment: Option<String>,
+    /// Name/version of the program that created the torrent.
     pub created_by: Option<String>,
     raw_info: Bytes,
 }
 
+/// The info dictionary from a torrent file.
+///
+/// Contains the core metadata that identifies the torrent content.
+/// The SHA1 hash of this dictionary (in bencode format) is the info hash.
 #[derive(Debug, Clone)]
 pub struct Info {
+    /// Suggested name for the file or directory.
     pub name: String,
+    /// Number of bytes per piece.
     pub piece_length: u64,
+    /// SHA1 hash of each piece (20 bytes each).
     pub pieces: Vec<[u8; 20]>,
+    /// List of files in the torrent.
     pub files: Vec<File>,
+    /// Total size of all files combined.
     pub total_length: u64,
+    /// If true, clients should only use trackers in the metainfo (no DHT/PEX).
     pub private: bool,
 }
 
+/// A file within a torrent.
+///
+/// For single-file torrents, there is one file with the torrent name.
+/// For multi-file torrents, paths are relative to the torrent's root directory.
 #[derive(Debug, Clone)]
 pub struct File {
+    /// Path to the file (relative to torrent root).
     pub path: PathBuf,
+    /// Size of the file in bytes.
     pub length: u64,
+    /// Byte offset within the torrent's piece data.
     pub offset: u64,
 }
 
 impl Metainfo {
+    /// Parses a torrent file from raw bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The data is not valid bencode
+    /// - Required fields are missing (info, name, pieces, etc.)
+    /// - The pieces field length is not a multiple of 20
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use rbit::metainfo::Metainfo;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let data = std::fs::read("example.torrent")?;
+    /// let metainfo = Metainfo::from_bytes(&data)?;
+    /// println!("Name: {}", metainfo.info.name);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn from_bytes(data: &[u8]) -> Result<Self, MetainfoError> {
         let value = decode(data)?;
         let dict = value
@@ -98,10 +163,18 @@ impl Metainfo {
         })
     }
 
+    /// Returns the raw bencoded info dictionary.
+    ///
+    /// This is useful for computing the info hash or for extension protocols
+    /// that need to share the raw info dictionary.
     pub fn raw_info(&self) -> &Bytes {
         &self.raw_info
     }
 
+    /// Returns all tracker URLs from both `announce` and `announce-list`.
+    ///
+    /// The primary tracker (from `announce`) comes first, followed by
+    /// trackers from `announce-list`. Duplicates are removed.
     pub fn trackers(&self) -> Vec<String> {
         let mut trackers = Vec::new();
 
@@ -120,6 +193,7 @@ impl Metainfo {
         trackers
     }
 
+    /// Returns `true` if this is a BitTorrent v2 torrent.
     pub fn is_v2(&self) -> bool {
         self.info_hash.is_v2()
     }

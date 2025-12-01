@@ -1,19 +1,182 @@
-//! rbit - A BitTorrent library
+//! # rbit
 //!
-//! This library provides a complete implementation of the BitTorrent protocol
-//! following BEP (BitTorrent Enhancement Proposals) specifications.
+//! A comprehensive BitTorrent library implementing core BEP (BitTorrent Enhancement
+//! Proposals) specifications in pure Rust.
 //!
-//! # Modules
+//! ## Overview
 //!
-//! - [`bencode`] - BEP-3 Bencode encoding/decoding
-//! - [`metainfo`] - BEP-3/9/52 Torrent metainfo, magnet links, v2 torrents
-//! - [`peer`] - BEP-3/6/10 Peer wire protocol, fast extension, extension protocol
-//! - [`tracker`] - BEP-3/15/23 HTTP and UDP tracker protocols
-//! - [`dht`] - BEP-5 Distributed Hash Table
-//! - [`pex`] - BEP-11 Peer Exchange
-//! - [`lsd`] - BEP-14 Local Service Discovery
-//! - [`storage`] - Disk I/O and file management
-//! - [`cache`] - Memory caching for pieces and blocks
+//! `rbit` provides building blocks for creating BitTorrent applications, including:
+//!
+//! - **Torrent parsing** - Read `.torrent` files and magnet links
+//! - **Peer communication** - Connect to and exchange data with peers
+//! - **Tracker protocols** - Discover peers via HTTP and UDP trackers
+//! - **DHT** - Trackerless peer discovery using a distributed hash table
+//! - **Storage management** - Efficient disk I/O with piece verification
+//! - **Caching** - Memory-efficient caching using the ARC algorithm
+//!
+//! ## Quick Start
+//!
+//! ### Parsing a torrent file
+//!
+//! ```no_run
+//! use rbit::Metainfo;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let torrent_data = std::fs::read("example.torrent")?;
+//! let metainfo = Metainfo::from_bytes(&torrent_data)?;
+//!
+//! println!("Name: {}", metainfo.info.name);
+//! println!("Info hash: {}", metainfo.info_hash);
+//! println!("Total size: {} bytes", metainfo.info.total_length);
+//! println!("Piece count: {}", metainfo.info.pieces.len());
+//!
+//! for tracker in metainfo.trackers() {
+//!     println!("Tracker: {}", tracker);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Parsing a magnet link
+//!
+//! ```
+//! use rbit::MagnetLink;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let magnet = MagnetLink::parse(
+//!     "magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a&dn=Example"
+//! )?;
+//!
+//! println!("Info hash: {}", magnet.info_hash);
+//! println!("Display name: {:?}", magnet.display_name);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Connecting to a peer
+//!
+//! ```no_run
+//! use rbit::{PeerConnection, PeerId, Message};
+//! use std::net::SocketAddr;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let peer_addr: SocketAddr = "192.168.1.100:6881".parse()?;
+//! let info_hash = [0u8; 20]; // Your torrent's info hash
+//! let our_peer_id = PeerId::generate();
+//!
+//! let mut conn = PeerConnection::connect(
+//!     peer_addr,
+//!     info_hash,
+//!     *our_peer_id.as_bytes()
+//! ).await?;
+//!
+//! // Express interest in downloading
+//! conn.send(Message::Interested).await?;
+//!
+//! // Wait for unchoke before requesting pieces
+//! loop {
+//!     match conn.receive().await? {
+//!         Message::Unchoke => break,
+//!         Message::Bitfield(bits) => println!("Peer has {} bytes of bitfield", bits.len()),
+//!         _ => {}
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Announcing to an HTTP tracker
+//!
+//! ```no_run
+//! use rbit::{HttpTracker, TrackerEvent};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let tracker = HttpTracker::new("http://tracker.example.com/announce")?;
+//!
+//! let response = tracker.announce(
+//!     &[0u8; 20],           // info_hash
+//!     &[0u8; 20],           // peer_id
+//!     6881,                 // port
+//!     0,                    // uploaded
+//!     0,                    // downloaded
+//!     1000,                 // left
+//!     TrackerEvent::Started,
+//! ).await?;
+//!
+//! println!("Found {} peers", response.peers.len());
+//! println!("Re-announce in {} seconds", response.interval);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Using the DHT for trackerless peer discovery
+//!
+//! ```no_run
+//! use rbit::DhtServer;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let dht = DhtServer::bind(6881).await?;
+//!
+//! // Bootstrap from well-known nodes
+//! dht.bootstrap().await?;
+//!
+//! // Find peers for a specific info hash
+//! let info_hash = [0u8; 20];
+//! let peers = dht.get_peers(info_hash).await?;
+//!
+//! for peer in peers {
+//!     println!("Found peer: {}", peer);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Supported BEPs
+//!
+//! | BEP | Description | Module |
+//! |-----|-------------|--------|
+//! | [BEP-3](http://bittorrent.org/beps/bep_0003.html) | BitTorrent Protocol | [`peer`], [`metainfo`], [`tracker`] |
+//! | [BEP-5](http://bittorrent.org/beps/bep_0005.html) | DHT Protocol | [`dht`] |
+//! | [BEP-6](http://bittorrent.org/beps/bep_0006.html) | Fast Extension | [`peer`] |
+//! | [BEP-9](http://bittorrent.org/beps/bep_0009.html) | Magnet Links | [`metainfo`] |
+//! | [BEP-10](http://bittorrent.org/beps/bep_0010.html) | Extension Protocol | [`peer`] |
+//! | [BEP-11](http://bittorrent.org/beps/bep_0011.html) | Peer Exchange (PEX) | [`pex`] |
+//! | [BEP-14](http://bittorrent.org/beps/bep_0014.html) | Local Service Discovery | [`lsd`] |
+//! | [BEP-15](http://bittorrent.org/beps/bep_0015.html) | UDP Tracker Protocol | [`tracker`] |
+//! | [BEP-23](http://bittorrent.org/beps/bep_0023.html) | Compact Peer Lists | [`tracker`] |
+//! | [BEP-52](http://bittorrent.org/beps/bep_0052.html) | BitTorrent v2 (partial) | [`metainfo`] |
+//!
+//! ## Module Overview
+//!
+//! - [`bencode`] - Bencode serialization format used throughout BitTorrent
+//! - [`metainfo`] - Torrent file parsing, magnet links, and info hashes
+//! - [`peer`] - Peer wire protocol for data exchange between clients
+//! - [`tracker`] - HTTP and UDP tracker clients for peer discovery
+//! - [`dht`] - Kademlia-based distributed hash table for trackerless operation
+//! - [`pex`] - Peer Exchange for sharing peer lists between connected peers
+//! - [`lsd`] - Local Service Discovery via multicast for LAN peers
+//! - [`storage`] - Disk I/O management with piece verification
+//! - [`cache`] - Memory caching for pieces and blocks using ARC
+//!
+//! ## Feature Highlights
+//!
+//! - **Async/await** - Built on tokio for efficient async I/O
+//! - **Zero-copy** - Uses `bytes::Bytes` for efficient buffer handling
+//! - **Memory-safe** - Pure Rust with no unsafe code in the public API
+//! - **Concurrent** - Thread-safe primitives from `parking_lot` and `dashmap`
+//!
+//! ## Architecture Notes
+//!
+//! This library provides low-level building blocks rather than a complete
+//! BitTorrent client. You are responsible for:
+//!
+//! - Coordinating peer connections and piece selection
+//! - Managing download/upload state across peers
+//! - Implementing rate limiting and choking algorithms
+//! - Handling torrent lifecycle (start, pause, resume, remove)
+//!
+//! For a complete client implementation, you would combine these modules
+//! with your own orchestration logic.
 
 pub mod bencode;
 pub mod cache;

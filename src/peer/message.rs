@@ -1,29 +1,50 @@
 use super::error::PeerError;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
+/// The BitTorrent protocol identifier.
 pub const PROTOCOL: &[u8] = b"BitTorrent protocol";
+/// Length of the handshake message in bytes.
 pub const HANDSHAKE_LEN: usize = 68;
 
+/// Message type identifiers in the peer wire protocol.
+///
+/// Each message (except KeepAlive) has a one-byte ID following the length prefix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum MessageId {
+    /// Stop sending data to the peer.
     Choke = 0,
+    /// Ready to send data to the peer.
     Unchoke = 1,
+    /// Want data from the peer.
     Interested = 2,
+    /// Don't want data from the peer.
     NotInterested = 3,
+    /// Announce a newly-acquired piece.
     Have = 4,
+    /// Announce all available pieces.
     Bitfield = 5,
+    /// Request a data block.
     Request = 6,
+    /// Send piece data.
     Piece = 7,
+    /// Cancel a pending request.
     Cancel = 8,
+    /// DHT port announcement.
     Port = 9,
     // Fast extension (BEP-6)
+    /// Suggest a piece to download.
     Suggest = 13,
+    /// Peer has all pieces (seeder).
     HaveAll = 14,
+    /// Peer has no pieces.
     HaveNone = 15,
+    /// Reject a block request.
     Reject = 16,
+    /// Allow downloading while choked.
     AllowedFast = 17,
     // Extension protocol (BEP-10)
+    /// Extension protocol message.
     Extended = 20,
 }
 
@@ -53,14 +74,36 @@ impl TryFrom<u8> for MessageId {
     }
 }
 
+/// The BitTorrent handshake message.
+///
+/// The handshake is the first message exchanged between peers and includes:
+/// - Protocol identifier ("BitTorrent protocol")
+/// - Reserved bytes (8 bytes, used for capability flags)
+/// - Info hash (20 bytes, identifies the torrent)
+/// - Peer ID (20 bytes, identifies the client)
+///
+/// # Reserved Bytes
+///
+/// Bits in the reserved bytes indicate protocol extensions:
+/// - Byte 5, bit 4: Extension protocol ([BEP-10])
+/// - Byte 7, bit 0: DHT ([BEP-5])
+/// - Byte 7, bit 2: Fast extension ([BEP-6])
+///
+/// [BEP-5]: http://bittorrent.org/beps/bep_0005.html
+/// [BEP-6]: http://bittorrent.org/beps/bep_0006.html
+/// [BEP-10]: http://bittorrent.org/beps/bep_0010.html
 #[derive(Debug, Clone)]
 pub struct Handshake {
+    /// The torrent's info hash.
     pub info_hash: [u8; 20],
+    /// The sender's peer ID.
     pub peer_id: [u8; 20],
+    /// Reserved bytes for protocol extensions.
     pub reserved: [u8; 8],
 }
 
 impl Handshake {
+    /// Creates a new handshake with extension protocol and fast extension enabled.
     pub fn new(info_hash: [u8; 20], peer_id: [u8; 20]) -> Self {
         let mut reserved = [0u8; 8];
         reserved[5] |= 0x10; // Extension protocol (BEP-10)
@@ -72,18 +115,22 @@ impl Handshake {
         }
     }
 
+    /// Returns `true` if the peer supports the extension protocol ([BEP-10]).
     pub fn supports_extension_protocol(&self) -> bool {
         (self.reserved[5] & 0x10) != 0
     }
 
+    /// Returns `true` if the peer supports the fast extension ([BEP-6]).
     pub fn supports_fast_extension(&self) -> bool {
         (self.reserved[7] & 0x04) != 0
     }
 
+    /// Returns `true` if the peer supports DHT ([BEP-5]).
     pub fn supports_dht(&self) -> bool {
         (self.reserved[7] & 0x01) != 0
     }
 
+    /// Encodes the handshake to bytes for transmission.
     pub fn encode(&self) -> Bytes {
         let mut buf = BytesMut::with_capacity(HANDSHAKE_LEN);
         buf.put_u8(19);
@@ -120,30 +167,71 @@ impl Handshake {
     }
 }
 
+/// A peer wire protocol message.
+///
+/// Messages are length-prefixed: a 4-byte big-endian length followed by
+/// a 1-byte message ID (except KeepAlive which has length 0) and payload.
+///
+/// # Examples
+///
+/// ```
+/// use rbit::peer::Message;
+///
+/// // Create a request for piece 0, offset 0, 16KB
+/// let request = Message::Request {
+///     index: 0,
+///     begin: 0,
+///     length: 16384,
+/// };
+///
+/// // Encode to bytes
+/// let bytes = request.encode();
+/// assert_eq!(bytes.len(), 17); // 4-byte length + 1-byte ID + 12-byte payload
+/// ```
 #[derive(Debug, Clone)]
 pub enum Message {
+    /// Empty message to keep the connection alive.
     KeepAlive,
+    /// We are choking the peer (not sending data).
     Choke,
+    /// We are unchoking the peer (ready to send data).
     Unchoke,
+    /// We are interested in the peer's data.
     Interested,
+    /// We are not interested in the peer's data.
     NotInterested,
+    /// Announce that we have a piece.
     Have { piece: u32 },
+    /// Bitfield of all pieces we have.
     Bitfield(Bytes),
+    /// Request a block of data.
     Request { index: u32, begin: u32, length: u32 },
+    /// Send piece data.
     Piece { index: u32, begin: u32, data: Bytes },
+    /// Cancel a pending request.
     Cancel { index: u32, begin: u32, length: u32 },
+    /// DHT port announcement.
     Port(u16),
     // Fast extension
+    /// Suggest a piece to download (fast extension).
     Suggest { piece: u32 },
+    /// Peer has all pieces (fast extension, seeder shortcut).
     HaveAll,
+    /// Peer has no pieces (fast extension).
     HaveNone,
+    /// Reject a block request (fast extension).
     Reject { index: u32, begin: u32, length: u32 },
+    /// Allow downloading this piece while choked (fast extension).
     AllowedFast { piece: u32 },
     // Extension protocol
+    /// Extension protocol message ([BEP-10]).
     Extended { id: u8, payload: Bytes },
 }
 
 impl Message {
+    /// Encodes the message to bytes for transmission.
+    ///
+    /// The output includes the 4-byte length prefix.
     pub fn encode(&self) -> Bytes {
         let mut buf = BytesMut::new();
 

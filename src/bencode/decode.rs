@@ -5,6 +5,36 @@ use std::collections::BTreeMap;
 
 const MAX_DEPTH: usize = 64;
 
+/// Decodes a bencode value from a byte slice.
+///
+/// The input must contain exactly one complete bencode value with no trailing data.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The input is empty or truncated ([`BencodeError::UnexpectedEof`])
+/// - The input contains invalid bencode syntax
+/// - The nesting depth exceeds 64 levels ([`BencodeError::NestingTooDeep`])
+/// - There is data after the value ([`BencodeError::TrailingData`])
+///
+/// # Examples
+///
+/// ```
+/// use rbit::bencode::decode;
+///
+/// // Decode different types
+/// let int = decode(b"i42e").unwrap();
+/// assert_eq!(int.as_integer(), Some(42));
+///
+/// let string = decode(b"5:hello").unwrap();
+/// assert_eq!(string.as_str(), Some("hello"));
+///
+/// let list = decode(b"li1ei2ei3ee").unwrap();
+/// assert_eq!(list.as_list().unwrap().len(), 3);
+///
+/// let dict = decode(b"d4:name5:Alice3:agei30ee").unwrap();
+/// assert_eq!(dict.get(b"name").and_then(|v| v.as_str()), Some("Alice"));
+/// ```
 pub fn decode(data: &[u8]) -> Result<Value, BencodeError> {
     let mut pos = 0;
     let value = decode_value(data, &mut pos, 0)?;

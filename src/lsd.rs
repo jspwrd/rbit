@@ -1,7 +1,46 @@
-//! Local Service Discovery (BEP-14)
+//! Local Service Discovery ([BEP-14]).
 //!
-//! This module implements Local Service Discovery for finding peers
-//! on the local network without using trackers or DHT.
+//! LSD allows finding peers on the local network via UDP multicast,
+//! without requiring trackers or DHT.
+//!
+//! # Overview
+//!
+//! LSD works by broadcasting announce messages to a multicast group.
+//! Other clients on the same network receive these messages and can
+//! connect directly.
+//!
+//! # Protocol
+//!
+//! LSD uses UDP multicast on port 6771:
+//! - IPv4: `239.192.152.143:6771`
+//! - IPv6: `[ff15::efc0:988f]:6771`
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use rbit::lsd::LsdService;
+//! use std::sync::Arc;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create LSD service on port 6881
+//! let lsd = Arc::new(LsdService::new(6881).await?);
+//!
+//! // Subscribe to receive announcements
+//! let mut rx = lsd.subscribe();
+//!
+//! // Start announcing our torrents
+//! let info_hashes = vec![[0u8; 20]];
+//! lsd.clone().start(info_hashes);
+//!
+//! // Listen for announcements
+//! while let Ok(announce) = rx.recv().await {
+//!     println!("Found local peer at {}:{}", announce.source.ip(), announce.port);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! [BEP-14]: http://bittorrent.org/beps/bep_0014.html
 
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
@@ -17,25 +56,36 @@ const LSD_ANNOUNCE_INTERVAL: Duration = Duration::from_secs(5 * 60);
 const LSD_COOKIE_SIZE: usize = 8;
 const LSD_CHANNEL_CAPACITY: usize = 64;
 
+/// Errors that can occur during LSD operations.
 #[derive(Debug, Error)]
 pub enum LsdError {
+    /// Network I/O error.
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// LSD protocol error.
     #[error("lsd error: {0}")]
     Lsd(String),
 
+    /// Invalid announce message format.
     #[error("invalid response: {0}")]
     InvalidResponse(String),
 }
 
+/// An LSD announce message from a local peer.
 #[derive(Debug, Clone)]
 pub struct LsdAnnounce {
+    /// The info hash being announced.
     pub info_hash: [u8; 20],
+    /// The port the peer is listening on.
     pub port: u16,
+    /// The source address of the announcement.
     pub source: SocketAddr,
 }
 
+/// Local Service Discovery service.
+///
+/// Handles sending and receiving LSD multicast messages.
 pub struct LsdService {
     socket_v4: Option<Arc<UdpSocket>>,
     socket_v6: Option<Arc<UdpSocket>>,
