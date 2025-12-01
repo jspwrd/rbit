@@ -309,6 +309,7 @@ fn compute_info_hash(raw_info: &[u8]) -> InfoHash {
     InfoHash::V1(hash)
 }
 
+#[allow(dead_code)]
 pub fn compute_v2_info_hash(raw_info: &[u8]) -> InfoHash {
     let mut hasher = Sha256::new();
     hasher.update(raw_info);

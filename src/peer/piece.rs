@@ -1,5 +1,6 @@
 use bytes::Bytes;
 
+#[allow(dead_code)]
 pub const BLOCK_SIZE: u32 = 16384;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -44,10 +45,12 @@ impl Block {
     }
 }
 
+#[allow(dead_code)]
 pub fn compute_block_count(piece_length: u64, block_size: u32) -> u32 {
     piece_length.div_ceil(block_size as u64) as u32
 }
 
+#[allow(dead_code)]
 pub fn compute_block_length(piece_length: u64, block_index: u32, block_size: u32) -> u32 {
     let offset = block_index as u64 * block_size as u64;
     let remaining = piece_length.saturating_sub(offset);
