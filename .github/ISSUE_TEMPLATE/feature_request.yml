@@ -1,0 +1,67 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe what you'd like to see.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: Describe the problem you're trying to solve or the use case for this feature.
+      placeholder: I'm trying to... but currently...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your proposed solution or API.
+      placeholder: |
+        Add a method like:
+        ```rust
+        impl PeerConnection {
+            pub async fn send_extended_message(&mut self, id: u8, payload: &[u8]) -> Result<(), PeerError> {
+                // ...
+            }
+        }
+        ```
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or workarounds you've considered.
+
+  - type: dropdown
+    id: bep
+    attributes:
+      label: Related BEP
+      description: If this implements or relates to a BEP specification.
+      options:
+        - Not BEP-related
+        - BEP-3 (The BitTorrent Protocol)
+        - BEP-5 (DHT Protocol)
+        - BEP-6 (Fast Extension)
+        - BEP-9 (Metadata Extension)
+        - BEP-10 (Extension Protocol)
+        - BEP-11 (Peer Exchange)
+        - BEP-14 (Local Service Discovery)
+        - BEP-15 (UDP Tracker)
+        - BEP-23 (Compact Peer Lists)
+        - BEP-52 (BitTorrent v2)
+        - Other BEP (specify in description)
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to submit a PR for this feature
