@@ -106,16 +106,18 @@
 //! [BEP-52]: http://bittorrent.org/beps/bep_0052.html
 
 mod error;
+mod file_tree;
 mod info_hash;
 mod magnet;
 mod merkle;
 mod torrent;
 
 pub use error::MetainfoError;
-pub use info_hash::InfoHash;
+pub use file_tree::FileTree;
+pub use info_hash::{InfoHash, InfoHashV1, InfoHashV2};
 pub use magnet::MagnetLink;
 pub use merkle::MerkleTree;
-pub use torrent::{File, Info, Metainfo};
+pub use torrent::{File, Info, Metainfo, TorrentVersion};
 
 #[cfg(test)]
 mod tests;

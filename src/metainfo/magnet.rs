@@ -169,6 +169,7 @@ impl MagnetLink {
         let hash_str = match &self.info_hash {
             InfoHash::V1(_) => format!("urn:btih:{}", self.info_hash.to_hex()),
             InfoHash::V2(_) => format!("urn:btmh:1220{}", self.info_hash.to_hex()),
+            InfoHash::Hybrid { v1, .. } => format!("urn:btih:{}", v1.to_hex()),
         };
         uri.push_str(&format!("xt={}", hash_str));
 

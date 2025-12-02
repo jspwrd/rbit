@@ -1,10 +1,38 @@
 use super::error::MetainfoError;
-use super::info_hash::InfoHash;
+use super::info_hash::{InfoHash, InfoHashV1, InfoHashV2};
 use crate::bencode::{decode, encode, Value};
 use bytes::Bytes;
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
 use std::path::PathBuf;
+
+/// The version of a torrent file.
+///
+/// BitTorrent has evolved through multiple versions:
+/// - **V1**: Original BitTorrent protocol (BEP-3)
+/// - **V2**: BitTorrent v2 with improved piece hashing (BEP-52)
+/// - **Hybrid**: Supports both v1 and v2 clients (BEP-47)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TorrentVersion {
+    /// BitTorrent v1 (BEP-3) - SHA1 piece hashes.
+    V1,
+    /// BitTorrent v2 (BEP-52) - SHA256 piece hashes with merkle trees.
+    V2,
+    /// Hybrid torrent (BEP-47) - Compatible with both v1 and v2 clients.
+    Hybrid,
+}
+
+impl TorrentVersion {
+    /// Returns true if this version supports v1 clients.
+    pub fn supports_v1(&self) -> bool {
+        matches!(self, TorrentVersion::V1 | TorrentVersion::Hybrid)
+    }
+
+    /// Returns true if this version supports v2 clients.
+    pub fn supports_v2(&self) -> bool {
+        matches!(self, TorrentVersion::V2 | TorrentVersion::Hybrid)
+    }
+}
 
 /// A parsed torrent file.
 ///
@@ -42,6 +70,8 @@ pub struct Metainfo {
     pub comment: Option<String>,
     /// Name/version of the program that created the torrent.
     pub created_by: Option<String>,
+    /// The torrent version (V1, V2, or Hybrid).
+    pub version: TorrentVersion,
     raw_info: Bytes,
 }
 
@@ -111,8 +141,35 @@ impl Metainfo {
             .get(b"info".as_slice())
             .ok_or(MetainfoError::MissingField("info"))?;
 
+        let info_dict = info_value
+            .as_dict()
+            .ok_or(MetainfoError::InvalidField("info"))?;
+
         let raw_info = Bytes::from(encode(info_value)?);
-        let info_hash = compute_info_hash(&raw_info);
+
+        // Detect version based on presence of v1/v2 specific fields
+        let has_pieces = info_dict.get(b"pieces".as_slice()).is_some();
+        let has_file_tree = info_dict.get(b"file tree".as_slice()).is_some();
+        let meta_version = info_dict
+            .get(b"meta version".as_slice())
+            .and_then(|v| v.as_integer());
+
+        let version = match (has_pieces, has_file_tree, meta_version) {
+            (true, true, _) => TorrentVersion::Hybrid,
+            (false, true, Some(2)) => TorrentVersion::V2,
+            (true, false, _) => TorrentVersion::V1,
+            _ => TorrentVersion::V1, // Default to V1 for backwards compatibility
+        };
+
+        let info_hash = match version {
+            TorrentVersion::V1 => compute_info_hash(&raw_info),
+            TorrentVersion::V2 => compute_v2_info_hash(&raw_info),
+            TorrentVersion::Hybrid => {
+                let v1 = InfoHashV1::from_info_bytes(&raw_info);
+                let v2 = InfoHashV2::from_info_bytes(&raw_info);
+                InfoHash::hybrid(v1, v2)
+            }
+        };
 
         let info = parse_info(info_value)?;
 
@@ -159,6 +216,7 @@ impl Metainfo {
             creation_date,
             comment,
             created_by,
+            version,
             raw_info,
         })
     }
@@ -195,7 +253,12 @@ impl Metainfo {
 
     /// Returns `true` if this is a BitTorrent v2 torrent.
     pub fn is_v2(&self) -> bool {
-        self.info_hash.is_v2()
+        matches!(self.version, TorrentVersion::V2)
+    }
+
+    /// Returns `true` if this is a hybrid torrent (BEP-47).
+    pub fn is_hybrid(&self) -> bool {
+        matches!(self.version, TorrentVersion::Hybrid)
     }
 }
 
@@ -309,8 +372,7 @@ fn compute_info_hash(raw_info: &[u8]) -> InfoHash {
     InfoHash::V1(hash)
 }
 
-#[allow(dead_code)]
-pub fn compute_v2_info_hash(raw_info: &[u8]) -> InfoHash {
+fn compute_v2_info_hash(raw_info: &[u8]) -> InfoHash {
     let mut hasher = Sha256::new();
     hasher.update(raw_info);
     let hash: [u8; 32] = hasher.finalize().into();

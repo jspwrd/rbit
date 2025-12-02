@@ -67,6 +67,7 @@ impl UdpTracker {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn announce(
         &mut self,
         info_hash: &[u8; 20],

@@ -178,8 +178,10 @@
 //! For a complete client implementation, you would combine these modules
 //! with your own orchestration logic.
 
+pub mod bandwidth;
 pub mod bencode;
 pub mod cache;
+pub mod constants;
 pub mod dht;
 pub mod lsd;
 pub mod metainfo;
@@ -187,19 +189,52 @@ pub mod peer;
 pub mod pex;
 pub mod storage;
 pub mod tracker;
+pub mod upnp;
 
+// Bandwidth limiting
+pub use bandwidth::{BandwidthLimiter, RateLimiter};
+
+// Bencode
 pub use bencode::{decode, encode, BencodeError, Value};
+
+// Caching
 pub use cache::{BlockCache, BufferPool, MemoryBudget, PieceCache};
+
+// DHT
 pub use dht::{DhtError, DhtMessage, DhtServer, Node, NodeId, RoutingTable};
+
+// LSD
 pub use lsd::{LsdAnnounce, LsdError, LsdService};
-pub use metainfo::{File, Info, InfoHash, MagnetLink, Metainfo, MetainfoError};
+
+// Metainfo
+pub use metainfo::{
+    File, FileTree, Info, InfoHash, InfoHashV1, InfoHashV2, MagnetLink, Metainfo, MetainfoError,
+    TorrentVersion,
+};
+
+// Peer
 pub use peer::{
-    Bitfield, Block, BlockRequest, ChokingAlgorithm, ExtensionHandshake, Handshake, Message,
-    PeerConnection, PeerError, PeerId, PeerState,
+    generate_allowed_fast_set, metadata_piece_count, metadata_piece_size, Bitfield, Block,
+    BlockRequest, ChokingAlgorithm, ChokingDecision, ExtensionHandshake, FastExtensionState,
+    Handshake, Message, MetadataMessage, MetadataMessageType, PeerConnection, PeerError, PeerId,
+    PeerState, PieceManager, METADATA_PIECE_SIZE,
 };
+
+// PEX
 pub use pex::{PexFlags, PexMessage, PexPeer};
-pub use storage::{AllocationMode, DiskManager, FileEntry, PieceInfo, StorageError, TorrentStorage};
-pub use tracker::{
-    AnnounceResponse, CompactPeer, HttpTracker, ScrapeResponse, TrackerError, TrackerEvent,
-    UdpTracker,
+
+// Storage
+pub use storage::{
+    coalesce_blocks, AllocationMode, CachingDiskManager, DiskManager, FileEntry, FlushRequest,
+    FlushResult, IoQueue, IoWorker, MemoryStats, PieceFileSpan, PieceInfo, StorageError,
+    TorrentStorage, WriteCoalescer, WriteOp, WritePriority, WriteRegion, WriteResult,
 };
+
+// Tracker
+pub use tracker::{
+    AnnounceParams, AnnounceResponse, CompactPeer, HttpTracker, Peer, ScrapeResponse,
+    TrackerClient, TrackerError, TrackerEvent, UdpTracker,
+};
+
+// UPnP
+pub use upnp::{PortMapper, PortMapping, Protocol, UpnpError};

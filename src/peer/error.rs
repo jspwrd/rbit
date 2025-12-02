@@ -42,4 +42,12 @@ pub enum PeerError {
     /// Error decoding bencode in extension messages.
     #[error("bencode error: {0}")]
     Bencode(#[from] crate::bencode::BencodeError),
+
+    /// Bitfield length doesn't match expected piece count.
+    #[error("bitfield length mismatch: expected {expected}, got {actual}")]
+    BitfieldLengthMismatch { expected: usize, actual: usize },
+
+    /// Invalid piece index received.
+    #[error("invalid piece index: {0}")]
+    InvalidPieceIndex(u32),
 }

@@ -31,8 +31,8 @@ impl NodeId {
 
     pub fn distance(&self, other: &NodeId) -> [u8; 20] {
         let mut dist = [0u8; 20];
-        for i in 0..20 {
-            dist[i] = self.0[i] ^ other.0[i];
+        for (i, d) in dist.iter_mut().enumerate() {
+            *d = self.0[i] ^ other.0[i];
         }
         dist
     }

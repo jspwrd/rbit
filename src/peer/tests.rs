@@ -169,7 +169,7 @@ fn test_extension_handshake() {
 #[test]
 fn test_block_request() {
     let req = BlockRequest::new(0, 0, 16384);
-    assert_eq!(req.piece, 0);
+    assert_eq!(req.piece_index, 0);
     assert_eq!(req.offset, 0);
     assert_eq!(req.length, 16384);
 }

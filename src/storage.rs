@@ -12,8 +12,10 @@
 //!
 //! - [`TorrentStorage`] - Per-torrent storage handler
 //! - [`DiskManager`] - Manages storage for multiple torrents
+//! - [`CachingDiskManager`] - High-level manager with integrated caching
 //! - [`FileEntry`] - Metadata about a file in the torrent
 //! - [`PieceInfo`] - Metadata about a piece (hash, offset, length)
+//! - [`PieceFileSpan`] - Mapping of a piece to file regions
 //!
 //! # Examples
 //!
@@ -81,12 +83,19 @@
 //! The storage layer validates file paths to prevent directory traversal
 //! attacks. Paths containing `..` or absolute paths are rejected.
 
+mod caching;
 mod error;
 mod file;
+mod io;
 mod manager;
 
+pub use caching::{CachingDiskManager, MemoryStats, WriteResult};
 pub use error::StorageError;
-pub use file::{AllocationMode, FileEntry, PieceInfo};
+pub use file::{AllocationMode, FileEntry, PieceFileSpan, PieceInfo};
+pub use io::{
+    coalesce_blocks, FlushRequest, FlushResult, IoQueue, IoWorker, WriteCoalescer, WriteOp,
+    WritePriority, WriteRegion,
+};
 pub use manager::{DiskManager, TorrentStorage};
 
 #[cfg(test)]

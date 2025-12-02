@@ -566,10 +566,7 @@ impl DiskManager {
     pub async fn read_piece(&self, info_hash: &str, piece_index: u32) -> Result<Bytes, StorageError> {
         let storage = self.get_storage(info_hash)?;
         let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "semaphore closed",
-            ))
+            StorageError::Io(std::io::Error::other("semaphore closed"))
         })?;
         storage.read_piece(piece_index).await
     }
@@ -583,10 +580,7 @@ impl DiskManager {
     ) -> Result<Bytes, StorageError> {
         let storage = self.get_storage(info_hash)?;
         let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "semaphore closed",
-            ))
+            StorageError::Io(std::io::Error::other("semaphore closed"))
         })?;
         storage.read_block(piece_index, offset, length).await
     }
@@ -599,10 +593,7 @@ impl DiskManager {
     ) -> Result<(), StorageError> {
         let storage = self.get_storage(info_hash)?;
         let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "semaphore closed",
-            ))
+            StorageError::Io(std::io::Error::other("semaphore closed"))
         })?;
         storage.write_piece(piece_index, data).await
     }
@@ -616,10 +607,7 @@ impl DiskManager {
     ) -> Result<(), StorageError> {
         let storage = self.get_storage(info_hash)?;
         let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "semaphore closed",
-            ))
+            StorageError::Io(std::io::Error::other("semaphore closed"))
         })?;
         storage.write_block(piece_index, offset, data).await
     }
@@ -627,10 +615,7 @@ impl DiskManager {
     pub async fn verify_piece(&self, info_hash: &str, piece_index: u32) -> Result<bool, StorageError> {
         let storage = self.get_storage(info_hash)?;
         let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "semaphore closed",
-            ))
+            StorageError::Io(std::io::Error::other("semaphore closed"))
         })?;
         storage.verify_piece(piece_index).await
     }

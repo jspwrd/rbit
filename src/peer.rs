@@ -130,19 +130,24 @@ mod error;
 mod extension;
 mod fast;
 mod message;
+mod metadata;
 mod peer_id;
 mod piece;
 mod transport;
 
 pub use bitfield::Bitfield;
-pub use choking::{ChokingAlgorithm, ChokingState, PeerStats};
+pub use choking::{ChokingAlgorithm, ChokingDecision, ChokingState, PeerStats};
 pub use connection::{PeerConnection, PeerState};
 pub use error::PeerError;
 pub use extension::{ExtensionHandshake, ExtensionMessage};
-pub use fast::FastExtension;
+pub use fast::{generate_allowed_fast_set, FastExtension, FastExtensionState};
 pub use message::{Handshake, Message, MessageId};
+pub use metadata::{
+    metadata_piece_count, metadata_piece_size, MetadataMessage, MetadataMessageType,
+    METADATA_PIECE_SIZE,
+};
 pub use peer_id::PeerId;
-pub use piece::{Block, BlockRequest};
+pub use piece::{Block, BlockRequest, PieceManager, BLOCK_SIZE, REQUEST_TIMEOUT};
 pub use transport::PeerTransport;
 
 #[cfg(test)]

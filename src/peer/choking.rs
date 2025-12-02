@@ -7,6 +7,34 @@ const UNCHOKE_INTERVAL: Duration = Duration::from_secs(10);
 const OPTIMISTIC_UNCHOKE_INTERVAL: Duration = Duration::from_secs(30);
 const MAX_UNCHOKED: usize = 4;
 
+/// The result of a choking decision for a peer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChokingDecision {
+    /// Choke the peer (stop sending data).
+    Choke,
+    /// Unchoke the peer (allow data transfer).
+    Unchoke,
+    /// No change to the current choking state.
+    NoChange,
+}
+
+impl ChokingDecision {
+    /// Returns true if this decision changes the peer's state.
+    pub fn is_change(&self) -> bool {
+        !matches!(self, ChokingDecision::NoChange)
+    }
+
+    /// Returns true if this is an unchoke decision.
+    pub fn is_unchoke(&self) -> bool {
+        matches!(self, ChokingDecision::Unchoke)
+    }
+
+    /// Returns true if this is a choke decision.
+    pub fn is_choke(&self) -> bool {
+        matches!(self, ChokingDecision::Choke)
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct PeerStats {
     pub downloaded: u64,
@@ -134,7 +162,7 @@ impl ChokingAlgorithm {
 
         for (addr, stats) in &self.peers {
             let should_unchoke = to_unchoke.contains(addr);
-            if should_unchoke != !stats.we_choking {
+            if should_unchoke == stats.we_choking {
                 decisions.push((*addr, should_unchoke));
             }
         }

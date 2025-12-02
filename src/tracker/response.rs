@@ -1,5 +1,64 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
+/// A peer returned from a tracker.
+///
+/// This struct includes the optional peer ID which may be present in
+/// non-compact tracker responses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Peer {
+    /// The peer's socket address (IP and port).
+    pub addr: SocketAddr,
+    /// The peer's 20-byte ID (optional, not present in compact responses).
+    pub peer_id: Option<[u8; 20]>,
+}
+
+impl Peer {
+    /// Creates a new peer with just an address.
+    pub fn new(addr: SocketAddr) -> Self {
+        Self { addr, peer_id: None }
+    }
+
+    /// Creates a new peer with address and peer ID.
+    pub fn with_id(addr: SocketAddr, peer_id: [u8; 20]) -> Self {
+        Self {
+            addr,
+            peer_id: Some(peer_id),
+        }
+    }
+
+    /// Parses a peer from compact IPv4 format (6 bytes).
+    ///
+    /// Format: 4 bytes IP + 2 bytes port (big-endian).
+    pub fn from_compact_v4(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() < 6 {
+            return None;
+        }
+        let ip = Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3]);
+        let port = u16::from_be_bytes([bytes[4], bytes[5]]);
+        Some(Self {
+            addr: SocketAddr::new(IpAddr::V4(ip), port),
+            peer_id: None,
+        })
+    }
+
+    /// Parses a peer from compact IPv6 format (18 bytes).
+    ///
+    /// Format: 16 bytes IP + 2 bytes port (big-endian).
+    pub fn from_compact_v6(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() < 18 {
+            return None;
+        }
+        let mut ip_bytes = [0u8; 16];
+        ip_bytes.copy_from_slice(&bytes[..16]);
+        let ip = Ipv6Addr::from(ip_bytes);
+        let port = u16::from_be_bytes([bytes[16], bytes[17]]);
+        Some(Self {
+            addr: SocketAddr::new(IpAddr::V6(ip), port),
+            peer_id: None,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrackerEvent {
     None,

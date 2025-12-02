@@ -57,6 +57,7 @@ impl HttpTracker {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn announce(
         &self,
         info_hash: &[u8; 20],
