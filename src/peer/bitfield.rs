@@ -144,12 +144,16 @@ impl Bitfield {
 
     /// Returns indices of all pieces that are not available.
     pub fn missing(&self) -> Vec<usize> {
-        (0..self.piece_count).filter(|&i| !self.has_piece(i)).collect()
+        (0..self.piece_count)
+            .filter(|&i| !self.has_piece(i))
+            .collect()
     }
 
     /// Returns indices of all available pieces.
     pub fn available_pieces(&self) -> Vec<usize> {
-        (0..self.piece_count).filter(|&i| self.has_piece(i)).collect()
+        (0..self.piece_count)
+            .filter(|&i| self.has_piece(i))
+            .collect()
     }
 
     /// Clears any spare bits in the last byte that don't correspond to pieces.

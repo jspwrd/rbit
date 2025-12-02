@@ -130,8 +130,7 @@ pub fn generate_allowed_fast_set(
                 break;
             }
 
-            let index =
-                u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) % num_pieces;
+            let index = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) % num_pieces;
 
             if !allowed_set.contains(&index) {
                 allowed_set.push(index);

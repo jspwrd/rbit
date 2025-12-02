@@ -50,7 +50,9 @@ impl UdpTracker {
         let resp_tid = u32::from_be_bytes([response[4], response[5], response[6], response[7]]);
 
         if action != ACTION_CONNECT || resp_tid != transaction_id {
-            return Err(TrackerError::InvalidResponse("connect response mismatch".into()));
+            return Err(TrackerError::InvalidResponse(
+                "connect response mismatch".into(),
+            ));
         }
 
         self.connection_id = Some(u64::from_be_bytes([

@@ -90,9 +90,7 @@ impl ExtensionHandshake {
             .and_then(|v| v.as_bytes())
             .map(|b| b.to_vec());
 
-        hs.reqq = dict
-            .get(b"reqq".as_slice())
-            .and_then(|v| v.as_integer());
+        hs.reqq = dict.get(b"reqq".as_slice()).and_then(|v| v.as_integer());
 
         hs.metadata_size = dict
             .get(b"metadata_size".as_slice())

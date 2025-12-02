@@ -213,7 +213,10 @@ impl TrackerClient {
     ///
     /// Returns [`TrackerError::UnsupportedProtocol`] if the URL doesn't start
     /// with `http://`, `https://`, or `udp://`.
-    pub async fn announce(&self, params: AnnounceParams<'_>) -> Result<AnnounceResponse, TrackerError> {
+    pub async fn announce(
+        &self,
+        params: AnnounceParams<'_>,
+    ) -> Result<AnnounceResponse, TrackerError> {
         // Get the v1 info hash bytes (trackers only support v1)
         let info_hash_bytes: [u8; 20] = match params.info_hash {
             InfoHash::V1(bytes) => *bytes,
@@ -255,7 +258,6 @@ impl TrackerClient {
             Err(TrackerError::UnsupportedProtocol(params.url.to_string()))
         }
     }
-
 }
 
 impl Default for TrackerClient {

@@ -10,8 +10,12 @@ pub type TransactionId = Bytes;
 #[derive(Debug, Clone)]
 pub enum DhtQuery {
     Ping,
-    FindNode { target: NodeId },
-    GetPeers { info_hash: [u8; 20] },
+    FindNode {
+        target: NodeId,
+    },
+    GetPeers {
+        info_hash: [u8; 20],
+    },
     AnnouncePeer {
         info_hash: [u8; 20],
         port: u16,
@@ -22,16 +26,26 @@ pub enum DhtQuery {
 
 #[derive(Debug, Clone)]
 pub enum DhtResponse {
-    Ping { id: NodeId },
-    FindNode { id: NodeId, nodes: Vec<Node> },
+    Ping {
+        id: NodeId,
+    },
+    FindNode {
+        id: NodeId,
+        nodes: Vec<Node>,
+    },
     GetPeers {
         id: NodeId,
         token: Bytes,
         peers: Option<Vec<SocketAddr>>,
         nodes: Option<Vec<Node>>,
     },
-    AnnouncePeer { id: NodeId },
-    Error { code: i64, message: String },
+    AnnouncePeer {
+        id: NodeId,
+    },
+    Error {
+        code: i64,
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -232,13 +246,14 @@ impl DhtMessage {
             .and_then(|b| NodeId::from_bytes(b).ok())
             .ok_or_else(|| DhtError::InvalidMessage("missing id in response".into()))?;
 
-        let nodes = resp.get(b"nodes".as_slice()).and_then(|v| v.as_bytes()).map(
-            |data| {
+        let nodes = resp
+            .get(b"nodes".as_slice())
+            .and_then(|v| v.as_bytes())
+            .map(|data| {
                 data.chunks_exact(26)
                     .filter_map(Node::from_compact)
                     .collect()
-            },
-        );
+            });
 
         let peers = resp
             .get(b"values".as_slice())

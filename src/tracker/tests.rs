@@ -1,5 +1,5 @@
-use super::*;
 use super::response::parse_compact_peers;
+use super::*;
 
 #[test]
 fn test_tracker_event() {

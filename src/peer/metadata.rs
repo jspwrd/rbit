@@ -135,18 +135,18 @@ impl MetadataMessage {
             .as_dict()
             .ok_or_else(|| PeerError::Extension("expected dict".into()))?;
 
-        let msg_type_byte = dict
-            .get(b"msg_type".as_slice())
-            .and_then(|v| v.as_integer())
-            .ok_or_else(|| PeerError::Extension("missing msg_type".into()))? as u8;
+        let msg_type_byte =
+            dict.get(b"msg_type".as_slice())
+                .and_then(|v| v.as_integer())
+                .ok_or_else(|| PeerError::Extension("missing msg_type".into()))? as u8;
 
         let msg_type = MetadataMessageType::from_byte(msg_type_byte)
             .ok_or_else(|| PeerError::Extension("invalid msg_type".into()))?;
 
-        let piece = dict
-            .get(b"piece".as_slice())
-            .and_then(|v| v.as_integer())
-            .ok_or_else(|| PeerError::Extension("missing piece".into()))? as u32;
+        let piece =
+            dict.get(b"piece".as_slice())
+                .and_then(|v| v.as_integer())
+                .ok_or_else(|| PeerError::Extension("missing piece".into()))? as u32;
 
         let total_size = dict
             .get(b"total_size".as_slice())

@@ -92,7 +92,10 @@ impl HttpTracker {
             .as_dict()
             .ok_or_else(|| TrackerError::InvalidResponse("expected dict".into()))?;
 
-        if let Some(failure) = dict.get(b"failure reason".as_slice()).and_then(|v| v.as_str()) {
+        if let Some(failure) = dict
+            .get(b"failure reason".as_slice())
+            .and_then(|v| v.as_str())
+        {
             return Err(TrackerError::TrackerError(failure.to_string()));
         }
 

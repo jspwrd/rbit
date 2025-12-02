@@ -71,7 +71,10 @@ impl FileHandleCache {
         Ok(())
     }
 
-    async fn get_or_open_read(&self, file_index: usize) -> Result<Arc<PerFileHandle>, StorageError> {
+    async fn get_or_open_read(
+        &self,
+        file_index: usize,
+    ) -> Result<Arc<PerFileHandle>, StorageError> {
         if let Some(handle) = self.handles.get(&file_index) {
             *handle.last_used.lock() = Instant::now();
             return Ok(handle.clone());
@@ -468,22 +471,19 @@ impl TorrentStorage {
                 futures.push(self.verify_piece(i as u32));
             }
 
-            let batch_results = match tokio::time::timeout(
-                BATCH_TIMEOUT,
-                futures::future::join_all(futures),
-            )
-            .await
-            {
-                Ok(results) => results,
-                Err(_) => {
-                    tracing::warn!(
-                        "Verification batch {}-{} timed out, marking as invalid",
-                        batch_start,
-                        batch_end
-                    );
-                    continue;
-                }
-            };
+            let batch_results =
+                match tokio::time::timeout(BATCH_TIMEOUT, futures::future::join_all(futures)).await
+                {
+                    Ok(results) => results,
+                    Err(_) => {
+                        tracing::warn!(
+                            "Verification batch {}-{} timed out, marking as invalid",
+                            batch_start,
+                            batch_end
+                        );
+                        continue;
+                    }
+                };
 
             for (i, result) in batch_results.into_iter().enumerate() {
                 let piece_idx = batch_start + i;
@@ -563,11 +563,17 @@ impl DiskManager {
             .ok_or_else(|| StorageError::TorrentNotFound(info_hash.to_string()))
     }
 
-    pub async fn read_piece(&self, info_hash: &str, piece_index: u32) -> Result<Bytes, StorageError> {
+    pub async fn read_piece(
+        &self,
+        info_hash: &str,
+        piece_index: u32,
+    ) -> Result<Bytes, StorageError> {
         let storage = self.get_storage(info_hash)?;
-        let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::other("semaphore closed"))
-        })?;
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| StorageError::Io(std::io::Error::other("semaphore closed")))?;
         storage.read_piece(piece_index).await
     }
 
@@ -579,9 +585,11 @@ impl DiskManager {
         length: u32,
     ) -> Result<Bytes, StorageError> {
         let storage = self.get_storage(info_hash)?;
-        let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::other("semaphore closed"))
-        })?;
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| StorageError::Io(std::io::Error::other("semaphore closed")))?;
         storage.read_block(piece_index, offset, length).await
     }
 
@@ -592,9 +600,11 @@ impl DiskManager {
         data: &[u8],
     ) -> Result<(), StorageError> {
         let storage = self.get_storage(info_hash)?;
-        let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::other("semaphore closed"))
-        })?;
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| StorageError::Io(std::io::Error::other("semaphore closed")))?;
         storage.write_piece(piece_index, data).await
     }
 
@@ -606,17 +616,25 @@ impl DiskManager {
         data: &[u8],
     ) -> Result<(), StorageError> {
         let storage = self.get_storage(info_hash)?;
-        let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::other("semaphore closed"))
-        })?;
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| StorageError::Io(std::io::Error::other("semaphore closed")))?;
         storage.write_block(piece_index, offset, data).await
     }
 
-    pub async fn verify_piece(&self, info_hash: &str, piece_index: u32) -> Result<bool, StorageError> {
+    pub async fn verify_piece(
+        &self,
+        info_hash: &str,
+        piece_index: u32,
+    ) -> Result<bool, StorageError> {
         let storage = self.get_storage(info_hash)?;
-        let _permit = self.semaphore.acquire().await.map_err(|_| {
-            StorageError::Io(std::io::Error::other("semaphore closed"))
-        })?;
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| StorageError::Io(std::io::Error::other("semaphore closed")))?;
         storage.verify_piece(piece_index).await
     }
 

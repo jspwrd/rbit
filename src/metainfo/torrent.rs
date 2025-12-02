@@ -133,9 +133,7 @@ impl Metainfo {
     /// ```
     pub fn from_bytes(data: &[u8]) -> Result<Self, MetainfoError> {
         let value = decode(data)?;
-        let dict = value
-            .as_dict()
-            .ok_or(MetainfoError::InvalidField("root"))?;
+        let dict = value.as_dict().ok_or(MetainfoError::InvalidField("root"))?;
 
         let info_value = dict
             .get(b"info".as_slice())
@@ -263,9 +261,7 @@ impl Metainfo {
 }
 
 fn parse_info(value: &Value) -> Result<Info, MetainfoError> {
-    let dict = value
-        .as_dict()
-        .ok_or(MetainfoError::InvalidField("info"))?;
+    let dict = value.as_dict().ok_or(MetainfoError::InvalidField("info"))?;
 
     let name = dict
         .get(b"name".as_slice())
@@ -302,9 +298,8 @@ fn parse_info(value: &Value) -> Result<Info, MetainfoError> {
         .map(|v| v == 1)
         .unwrap_or(false);
 
-    let (files, total_length) = if let Some(length) = dict
-        .get(b"length".as_slice())
-        .and_then(|v| v.as_integer())
+    let (files, total_length) = if let Some(length) =
+        dict.get(b"length".as_slice()).and_then(|v| v.as_integer())
     {
         let length = length as u64;
         let file = File {

@@ -15,7 +15,10 @@ pub struct Peer {
 impl Peer {
     /// Creates a new peer with just an address.
     pub fn new(addr: SocketAddr) -> Self {
-        Self { addr, peer_id: None }
+        Self {
+            addr,
+            peer_id: None,
+        }
     }
 
     /// Creates a new peer with address and peer ID.
