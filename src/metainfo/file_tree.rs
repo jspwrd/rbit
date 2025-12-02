@@ -12,6 +12,8 @@ pub struct FileTreeEntry {
     pub length: u64,
     /// The root hash of the file's merkle tree (32 bytes).
     pub pieces_root: Option<[u8; 32]>,
+    /// File attributes (e.g., "p" for padding, "x" for executable, "h" for hidden).
+    pub attr: Option<String>,
 }
 
 /// Hierarchical file structure for BitTorrent v2 torrents (BEP-52).
@@ -35,6 +37,8 @@ pub struct FlattenedFile {
     pub length: u64,
     /// Pieces root hash (32 bytes) for v2 verification.
     pub pieces_root: Option<[u8; 32]>,
+    /// File attributes (e.g., "p" for padding, "x" for executable, "h" for hidden).
+    pub attr: Option<String>,
 }
 
 impl FileTree {
@@ -110,9 +114,15 @@ fn parse_file_tree_node(value: &Value) -> Result<FileTree, MetainfoError> {
                 }
             });
 
+        let attr = file_dict
+            .get(b"attr".as_slice())
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
         return Ok(FileTree::File(FileTreeEntry {
             length,
             pieces_root,
+            attr,
         }));
     }
 
@@ -142,6 +152,7 @@ fn flatten_recursive(tree: &FileTree, current_path: PathBuf, files: &mut Vec<Fla
                 path: current_path,
                 length: entry.length,
                 pieces_root: entry.pieces_root,
+                attr: entry.attr.clone(),
             });
         }
         FileTree::Directory(children) => {

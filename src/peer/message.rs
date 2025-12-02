@@ -46,6 +46,13 @@ pub enum MessageId {
     // Extension protocol (BEP-10)
     /// Extension protocol message.
     Extended = 20,
+    // BitTorrent v2 (BEP-52)
+    /// Request merkle tree hashes.
+    HashRequest = 21,
+    /// Merkle tree hash response.
+    Hashes = 22,
+    /// Reject a hash request.
+    HashReject = 23,
 }
 
 impl TryFrom<u8> for MessageId {
@@ -69,6 +76,9 @@ impl TryFrom<u8> for MessageId {
             16 => Ok(MessageId::Reject),
             17 => Ok(MessageId::AllowedFast),
             20 => Ok(MessageId::Extended),
+            21 => Ok(MessageId::HashRequest),
+            22 => Ok(MessageId::Hashes),
+            23 => Ok(MessageId::HashReject),
             _ => Err(PeerError::InvalidMessageId(value)),
         }
     }
@@ -115,6 +125,21 @@ impl Handshake {
         }
     }
 
+    /// Creates a new handshake with v2 support enabled.
+    ///
+    /// This sets the extension protocol, fast extension, and v2 capability bits.
+    pub fn new_v2(info_hash: [u8; 20], peer_id: [u8; 20]) -> Self {
+        let mut reserved = [0u8; 8];
+        reserved[5] |= 0x10; // Extension protocol (BEP-10)
+        reserved[7] |= 0x04; // Fast extension (BEP-6)
+        reserved[7] |= 0x10; // BitTorrent v2 (BEP-52)
+        Self {
+            info_hash,
+            peer_id,
+            reserved,
+        }
+    }
+
     /// Returns `true` if the peer supports the extension protocol ([BEP-10]).
     pub fn supports_extension_protocol(&self) -> bool {
         (self.reserved[5] & 0x10) != 0
@@ -128,6 +153,23 @@ impl Handshake {
     /// Returns `true` if the peer supports DHT ([BEP-5]).
     pub fn supports_dht(&self) -> bool {
         (self.reserved[7] & 0x01) != 0
+    }
+
+    /// Returns `true` if the peer supports BitTorrent v2 ([BEP-52]).
+    ///
+    /// The v2 capability is indicated by the 4th most significant bit
+    /// in the last byte of the reserved field (bit 4, 0x10).
+    pub fn supports_v2(&self) -> bool {
+        (self.reserved[7] & 0x10) != 0
+    }
+
+    /// Sets the v2 support bit in the reserved field.
+    pub fn set_v2_support(&mut self, enabled: bool) {
+        if enabled {
+            self.reserved[7] |= 0x10;
+        } else {
+            self.reserved[7] &= !0x10;
+        }
     }
 
     /// Encodes the handshake to bytes for transmission.
@@ -226,6 +268,54 @@ pub enum Message {
     // Extension protocol
     /// Extension protocol message ([BEP-10]).
     Extended { id: u8, payload: Bytes },
+    // BitTorrent v2 (BEP-52)
+    /// Request merkle tree hashes from a peer.
+    ///
+    /// Used to request hash blocks from a file's merkle tree.
+    HashRequest {
+        /// The merkle root of the file (32 bytes).
+        pieces_root: [u8; 32],
+        /// The tree layer to request (0 = leaf layer).
+        base_layer: u32,
+        /// Starting index in the layer (must be multiple of length).
+        index: u32,
+        /// Number of hashes to request (must be power of 2, >= 2, <= 512).
+        length: u32,
+        /// Number of ancestor layers to include as proof.
+        proof_layers: u32,
+    },
+    /// Response containing merkle tree hashes.
+    ///
+    /// Contains the requested hashes plus uncle hashes for verification.
+    Hashes {
+        /// The merkle root of the file (32 bytes).
+        pieces_root: [u8; 32],
+        /// The tree layer (0 = leaf layer).
+        base_layer: u32,
+        /// Starting index in the layer.
+        index: u32,
+        /// Number of hashes in the base layer.
+        length: u32,
+        /// Number of proof layers included.
+        proof_layers: u32,
+        /// Concatenated 32-byte hashes (length + proof hashes).
+        hashes: Bytes,
+    },
+    /// Reject a hash request.
+    ///
+    /// Sent when a peer cannot or will not service a hash request.
+    HashReject {
+        /// The merkle root of the file (32 bytes).
+        pieces_root: [u8; 32],
+        /// The tree layer requested.
+        base_layer: u32,
+        /// Starting index requested.
+        index: u32,
+        /// Number of hashes requested.
+        length: u32,
+        /// Number of proof layers requested.
+        proof_layers: u32,
+    },
 }
 
 impl Message {
@@ -333,6 +423,57 @@ impl Message {
                 buf.put_u8(MessageId::Extended as u8);
                 buf.put_u8(*id);
                 buf.put_slice(payload);
+            }
+            // BitTorrent v2 messages (BEP-52)
+            // HashRequest: 1 byte msg_id + 32 bytes root + 4*4 bytes fields = 49 bytes
+            Message::HashRequest {
+                pieces_root,
+                base_layer,
+                index,
+                length,
+                proof_layers,
+            } => {
+                buf.put_u32(49);
+                buf.put_u8(MessageId::HashRequest as u8);
+                buf.put_slice(pieces_root);
+                buf.put_u32(*base_layer);
+                buf.put_u32(*index);
+                buf.put_u32(*length);
+                buf.put_u32(*proof_layers);
+            }
+            // Hashes: 1 byte msg_id + 32 bytes root + 4*4 bytes fields + hashes
+            Message::Hashes {
+                pieces_root,
+                base_layer,
+                index,
+                length,
+                proof_layers,
+                hashes,
+            } => {
+                buf.put_u32(49 + hashes.len() as u32);
+                buf.put_u8(MessageId::Hashes as u8);
+                buf.put_slice(pieces_root);
+                buf.put_u32(*base_layer);
+                buf.put_u32(*index);
+                buf.put_u32(*length);
+                buf.put_u32(*proof_layers);
+                buf.put_slice(hashes);
+            }
+            // HashReject: same as HashRequest (49 bytes)
+            Message::HashReject {
+                pieces_root,
+                base_layer,
+                index,
+                length,
+                proof_layers,
+            } => {
+                buf.put_u32(49);
+                buf.put_u8(MessageId::HashReject as u8);
+                buf.put_slice(pieces_root);
+                buf.put_u32(*base_layer);
+                buf.put_u32(*index);
+                buf.put_u32(*length);
+                buf.put_u32(*proof_layers);
             }
         }
 
@@ -448,6 +589,92 @@ impl Message {
                     payload,
                 })
             }
+            // BitTorrent v2 messages (BEP-52)
+            MessageId::HashRequest => {
+                // 32 bytes root + 4*4 bytes = 48 bytes payload
+                if data.remaining() < 48 {
+                    return Err(PeerError::InvalidMessage("hash request too short".into()));
+                }
+                let mut pieces_root = [0u8; 32];
+                pieces_root.copy_from_slice(&data.copy_to_bytes(32));
+                Ok(Message::HashRequest {
+                    pieces_root,
+                    base_layer: data.get_u32(),
+                    index: data.get_u32(),
+                    length: data.get_u32(),
+                    proof_layers: data.get_u32(),
+                })
+            }
+            MessageId::Hashes => {
+                // 32 bytes root + 4*4 bytes = 48 bytes header, rest is hashes
+                if data.remaining() < 48 {
+                    return Err(PeerError::InvalidMessage("hashes too short".into()));
+                }
+                let mut pieces_root = [0u8; 32];
+                pieces_root.copy_from_slice(&data.copy_to_bytes(32));
+                let base_layer = data.get_u32();
+                let index = data.get_u32();
+                let hash_length = data.get_u32();
+                let proof_layers = data.get_u32();
+                // Remaining bytes are the concatenated hashes
+                let hashes_len = length - 49; // length - 1 (msg_id) - 48 (header)
+                if data.remaining() < hashes_len {
+                    return Err(PeerError::InvalidMessage("hashes data too short".into()));
+                }
+                let hashes = data.copy_to_bytes(hashes_len);
+                // Validate hash data length is multiple of 32
+                if hashes.len() % 32 != 0 {
+                    return Err(PeerError::InvalidMessage(
+                        "hashes not multiple of 32 bytes".into(),
+                    ));
+                }
+                Ok(Message::Hashes {
+                    pieces_root,
+                    base_layer,
+                    index,
+                    length: hash_length,
+                    proof_layers,
+                    hashes,
+                })
+            }
+            MessageId::HashReject => {
+                // 32 bytes root + 4*4 bytes = 48 bytes payload
+                if data.remaining() < 48 {
+                    return Err(PeerError::InvalidMessage("hash reject too short".into()));
+                }
+                let mut pieces_root = [0u8; 32];
+                pieces_root.copy_from_slice(&data.copy_to_bytes(32));
+                Ok(Message::HashReject {
+                    pieces_root,
+                    base_layer: data.get_u32(),
+                    index: data.get_u32(),
+                    length: data.get_u32(),
+                    proof_layers: data.get_u32(),
+                })
+            }
         }
     }
+}
+
+/// Validates a HashRequest according to BEP-52 requirements.
+///
+/// Returns an error message if invalid, or None if valid.
+pub fn validate_hash_request(length: u32, index: u32) -> Option<&'static str> {
+    // Length must be >= 2
+    if length < 2 {
+        return Some("length must be >= 2");
+    }
+    // Length must be power of 2
+    if length & (length - 1) != 0 {
+        return Some("length must be power of 2");
+    }
+    // Length should not exceed 512 (soft limit, but we enforce it)
+    if length > 512 {
+        return Some("length exceeds 512");
+    }
+    // Index must be multiple of length
+    if index % length != 0 {
+        return Some("index must be multiple of length");
+    }
+    None
 }

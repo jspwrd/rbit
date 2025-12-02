@@ -28,7 +28,7 @@
 //! println!("Name: {}", metainfo.info.name);
 //! println!("Info hash: {}", metainfo.info_hash);
 //! println!("Total size: {} bytes", metainfo.info.total_length);
-//! println!("Piece count: {}", metainfo.info.pieces.len());
+//! println!("Piece count: {}", metainfo.info.piece_count());
 //!
 //! for tracker in metainfo.trackers() {
 //!     println!("Tracker: {}", tracker);
@@ -208,16 +208,18 @@ pub use lsd::{LsdAnnounce, LsdError, LsdService};
 
 // Metainfo
 pub use metainfo::{
-    File, FileTree, Info, InfoHash, InfoHashV1, InfoHashV2, MagnetLink, Metainfo, MetainfoError,
-    TorrentVersion,
+    compute_piece_root, compute_root, extract_layer_hashes, generate_proof_hashes, hash_block,
+    hash_data_blocks, verify_piece, verify_piece_layer, File, FileTree, FlattenedFile, Info,
+    InfoHash, InfoHashV1, InfoHashV2, MagnetLink, MerkleTree, Metainfo, MetainfoError, PieceHashes,
+    PieceLayers, TorrentVersion, MERKLE_BLOCK_SIZE,
 };
 
 // Peer
 pub use peer::{
-    generate_allowed_fast_set, metadata_piece_count, metadata_piece_size, Bitfield, Block,
-    BlockRequest, ChokingAlgorithm, ChokingDecision, ExtensionHandshake, FastExtensionState,
-    Handshake, Message, MetadataMessage, MetadataMessageType, PeerConnection, PeerError, PeerId,
-    PeerState, PieceManager, METADATA_PIECE_SIZE,
+    generate_allowed_fast_set, metadata_piece_count, metadata_piece_size, validate_hash_request,
+    Bitfield, Block, BlockRequest, ChokingAlgorithm, ChokingDecision, ExtensionHandshake,
+    FastExtensionState, Handshake, Message, MessageId, MetadataMessage, MetadataMessageType,
+    PeerConnection, PeerError, PeerId, PeerState, PieceManager, ProtocolMode, METADATA_PIECE_SIZE,
 };
 
 // PEX
@@ -227,7 +229,7 @@ pub use pex::{PexFlags, PexMessage, PexPeer};
 pub use storage::{
     coalesce_blocks, AllocationMode, CachingDiskManager, DiskManager, FileEntry, FlushRequest,
     FlushResult, IoQueue, IoWorker, MemoryStats, PieceFileSpan, PieceInfo, StorageError,
-    TorrentStorage, WriteCoalescer, WriteOp, WritePriority, WriteRegion, WriteResult,
+    TorrentStorage, V2PieceMap, WriteCoalescer, WriteOp, WritePriority, WriteRegion, WriteResult,
 };
 
 // Tracker

@@ -1,8 +1,8 @@
 use super::error::MetainfoError;
-use super::info_hash::InfoHash;
+use super::info_hash::{InfoHash, InfoHashV1, InfoHashV2};
 use std::collections::HashMap;
 
-/// A parsed magnet link ([BEP-9]).
+/// A parsed magnet link ([BEP-9], [BEP-52]).
 ///
 /// Magnet links allow sharing torrents without a `.torrent` file by encoding
 /// the info hash and optional metadata in a URI.
@@ -13,6 +13,12 @@ use std::collections::HashMap;
 /// ```text
 /// magnet:?xt=urn:btih:<info-hash>&dn=<name>&tr=<tracker>...
 /// ```
+///
+/// For BitTorrent v2 and hybrid torrents, magnet links can contain both v1 and v2 hashes:
+/// - `urn:btih:<hex>` - v1 info hash (40 hex chars = 20 bytes SHA1)
+/// - `urn:btmh:1220<hex>` - v2 info hash (64 hex chars = 32 bytes SHA256, with multihash prefix)
+///
+/// A hybrid magnet link contains both `xt` parameters.
 ///
 /// # Examples
 ///
@@ -31,9 +37,11 @@ use std::collections::HashMap;
 /// ```
 ///
 /// [BEP-9]: http://bittorrent.org/beps/bep_0009.html
+/// [BEP-52]: http://bittorrent.org/beps/bep_0052.html
 #[derive(Debug, Clone)]
 pub struct MagnetLink {
     /// The torrent's info hash (required).
+    /// May be V1, V2, or Hybrid depending on the `xt` parameters present.
     pub info_hash: InfoHash,
     /// Suggested display name for the torrent.
     pub display_name: Option<String>,
@@ -87,29 +95,60 @@ impl MagnetLink {
         let query = &uri[8..];
         let params = parse_query_string(query);
 
-        let xt = params
+        let xt_values = params
             .get("xt")
-            .and_then(|v| v.first())
             .ok_or_else(|| MetainfoError::InvalidMagnetLink("missing xt parameter".into()))?;
 
-        let info_hash = if let Some(hash) = xt.strip_prefix("urn:btih:") {
-            if hash.len() == 40 {
-                InfoHash::from_hex(hash)?
-            } else if hash.len() == 32 {
-                let decoded = base32_decode(hash)
-                    .ok_or_else(|| MetainfoError::InvalidMagnetLink("invalid base32".into()))?;
-                InfoHash::from_v1_bytes(&decoded)?
-            } else {
+        // Parse all xt parameters - hybrid magnets have both btih and btmh
+        let mut v1_hash: Option<InfoHashV1> = None;
+        let mut v2_hash: Option<InfoHashV2> = None;
+
+        for xt in xt_values {
+            if let Some(hash) = xt.strip_prefix("urn:btih:") {
+                // v1 info hash (SHA1, 20 bytes)
+                if hash.len() == 40 {
+                    // Hex encoded
+                    v1_hash = Some(InfoHashV1::from_hex(hash)?);
+                } else if hash.len() == 32 {
+                    // Base32 encoded
+                    let decoded = base32_decode(hash)
+                        .ok_or_else(|| MetainfoError::InvalidMagnetLink("invalid base32".into()))?;
+                    if decoded.len() != 20 {
+                        return Err(MetainfoError::InvalidMagnetLink(
+                            "invalid base32 decoded length".into(),
+                        ));
+                    }
+                    let mut arr = [0u8; 20];
+                    arr.copy_from_slice(&decoded);
+                    v1_hash = Some(InfoHashV1::from_bytes(arr));
+                } else {
+                    return Err(MetainfoError::InvalidMagnetLink(
+                        "invalid btih hash length".into(),
+                    ));
+                }
+            } else if let Some(hash) = xt.strip_prefix("urn:btmh:1220") {
+                // v2 info hash (SHA256, 32 bytes)
+                // The "1220" prefix is multihash: 0x12 = SHA256, 0x20 = 32 bytes
+                if hash.len() != 64 {
+                    return Err(MetainfoError::InvalidMagnetLink(
+                        "invalid btmh hash length (expected 64 hex chars)".into(),
+                    ));
+                }
+                v2_hash = Some(InfoHashV2::from_hex(hash)?);
+            }
+            // Ignore other xt formats (could be other protocols)
+        }
+
+        // Build the appropriate InfoHash variant
+        let info_hash = match (v1_hash, v2_hash) {
+            (Some(v1), Some(v2)) => InfoHash::Hybrid { v1, v2 },
+            (Some(v1), None) => InfoHash::V1(v1.0),
+            (None, Some(v2)) => InfoHash::V2(v2.0),
+            (None, None) => {
                 return Err(MetainfoError::InvalidMagnetLink(
-                    "invalid info hash length".into(),
+                    "no valid btih or btmh parameter found".into(),
                 ));
             }
-        } else if let Some(hash) = xt.strip_prefix("urn:btmh:1220") {
-            InfoHash::from_hex(hash)?
-        } else {
-            return Err(MetainfoError::InvalidMagnetLink(
-                "unsupported xt format".into(),
-            ));
         };
 
         let display_name = params
@@ -143,6 +182,7 @@ impl MagnetLink {
 
     /// Converts this magnet link back to a URI string.
     ///
+    /// For hybrid info hashes, both v1 (btih) and v2 (btmh) xt parameters are included.
     /// The output includes the info hash and any populated optional fields
     /// (display name, trackers, web seeds).
     ///
@@ -166,12 +206,20 @@ impl MagnetLink {
     pub fn to_uri(&self) -> String {
         let mut uri = String::from("magnet:?");
 
-        let hash_str = match &self.info_hash {
-            InfoHash::V1(_) => format!("urn:btih:{}", self.info_hash.to_hex()),
-            InfoHash::V2(_) => format!("urn:btmh:1220{}", self.info_hash.to_hex()),
-            InfoHash::Hybrid { v1, .. } => format!("urn:btih:{}", v1.to_hex()),
+        match &self.info_hash {
+            InfoHash::V1(hash) => {
+                uri.push_str(&format!("xt=urn:btih:{}", hex_encode(hash)));
+            }
+            InfoHash::V2(hash) => {
+                // Multihash format: 0x12 (sha256) 0x20 (32 bytes) + hash
+                uri.push_str(&format!("xt=urn:btmh:1220{}", hex_encode(hash)));
+            }
+            InfoHash::Hybrid { v1, v2 } => {
+                // Include both for hybrid torrents
+                uri.push_str(&format!("xt=urn:btih:{}", v1.to_hex()));
+                uri.push_str(&format!("&xt=urn:btmh:1220{}", v2.to_hex()));
+            }
         };
-        uri.push_str(&format!("xt={}", hash_str));
 
         if let Some(ref name) = self.display_name {
             uri.push_str(&format!("&dn={}", url_encode(name)));
@@ -183,6 +231,10 @@ impl MagnetLink {
 
         for ws in &self.web_seeds {
             uri.push_str(&format!("&ws={}", url_encode(ws)));
+        }
+
+        for peer in &self.peer_addresses {
+            uri.push_str(&format!("&x.pe={}", url_encode(peer)));
         }
 
         uri
@@ -244,6 +296,16 @@ fn url_encode(s: &str) -> String {
     }
 
     result
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
+            use std::fmt::Write;
+            let _ = write!(s, "{:02x}", b);
+            s
+        })
 }
 
 fn base32_decode(input: &str) -> Option<Vec<u8>> {

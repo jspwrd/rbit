@@ -1,10 +1,10 @@
 use super::error::StorageError;
-use super::file::{AllocationMode, FileEntry, PieceFileSpan, PieceInfo};
+use super::file::{AllocationMode, FileEntry, PieceFileSpan, PieceInfo, V2PieceMap};
+use crate::metainfo::{compute_root, verify_piece_layer};
 use bytes::Bytes;
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use sha1::{Digest, Sha1};
-use sha2::Sha256;
 use std::collections::HashMap;
 use std::io::SeekFrom;
 use std::path::{Component, Path, PathBuf};
@@ -170,9 +170,14 @@ pub struct TorrentStorage {
     allocation_mode: AllocationMode,
     is_v2: bool,
     handle_cache: FileHandleCache,
+    /// V2 piece-to-file mapping (only set for v2/hybrid torrents)
+    v2_piece_map: Option<V2PieceMap>,
+    /// Piece length in bytes (needed for v2 piece calculations)
+    piece_length: u64,
 }
 
 impl TorrentStorage {
+    /// Creates a new torrent storage (v1 style).
     pub fn new(
         base_path: PathBuf,
         files: Vec<FileEntry>,
@@ -180,9 +185,31 @@ impl TorrentStorage {
         total_length: u64,
         is_v2: bool,
     ) -> Result<Self, StorageError> {
+        // Infer piece length from first piece if available
+        let piece_length = pieces.first().map(|p| p.length).unwrap_or(0);
+        Self::with_piece_length(base_path, files, pieces, total_length, is_v2, piece_length)
+    }
+
+    /// Creates a new torrent storage with explicit piece length (needed for v2).
+    pub fn with_piece_length(
+        base_path: PathBuf,
+        files: Vec<FileEntry>,
+        pieces: Vec<PieceInfo>,
+        total_length: u64,
+        is_v2: bool,
+        piece_length: u64,
+    ) -> Result<Self, StorageError> {
         validate_all_file_paths(&files)?;
 
         let handle_cache = FileHandleCache::new(base_path.clone(), files.clone());
+
+        // Build v2 piece map if this is a v2 torrent
+        let v2_piece_map = if is_v2 && piece_length > 0 {
+            Some(V2PieceMap::new(&files, piece_length))
+        } else {
+            None
+        };
+
         Ok(Self {
             base_path,
             files,
@@ -191,7 +218,29 @@ impl TorrentStorage {
             allocation_mode: AllocationMode::Sparse,
             is_v2,
             handle_cache,
+            v2_piece_map,
+            piece_length,
         })
+    }
+
+    /// Returns the v2 piece map if available.
+    pub fn v2_piece_map(&self) -> Option<&V2PieceMap> {
+        self.v2_piece_map.as_ref()
+    }
+
+    /// Returns the piece length.
+    pub fn get_piece_length(&self) -> u64 {
+        self.piece_length
+    }
+
+    /// Returns the file entry for a given file index.
+    pub fn get_file(&self, file_index: usize) -> Option<&FileEntry> {
+        self.files.get(file_index)
+    }
+
+    /// Returns all file entries.
+    pub fn files(&self) -> &[FileEntry] {
+        &self.files
     }
 
     pub fn with_allocation_mode(mut self, mode: AllocationMode) -> Self {
@@ -215,6 +264,13 @@ impl TorrentStorage {
     }
 
     fn piece_file_spans(&self, piece_index: u32) -> Result<Vec<PieceFileSpan>, StorageError> {
+        // For v2 torrents, use the optimized piece map (O(1) lookup)
+        // In v2, pieces never span files - each piece belongs to exactly one file
+        if let Some(ref v2_map) = self.v2_piece_map {
+            return self.piece_file_spans_v2(piece_index, v2_map);
+        }
+
+        // V1 path: pieces can span multiple files
         let piece = self
             .pieces
             .get(piece_index as usize)
@@ -250,12 +306,55 @@ impl TorrentStorage {
         Ok(spans)
     }
 
+    /// Optimized piece-to-file mapping for v2 torrents.
+    ///
+    /// In v2 torrents, each piece belongs to exactly one file (pieces never span files).
+    /// This uses the V2PieceMap for O(1) file lookup instead of iterating all files.
+    fn piece_file_spans_v2(
+        &self,
+        piece_index: u32,
+        v2_map: &V2PieceMap,
+    ) -> Result<Vec<PieceFileSpan>, StorageError> {
+        // Look up which file this piece belongs to
+        let (file_idx, local_piece_idx) = v2_map
+            .global_to_file(piece_index)
+            .ok_or(StorageError::InvalidPieceIndex(piece_index))?;
+
+        let file = self
+            .files
+            .get(file_idx)
+            .ok_or(StorageError::InvalidPieceIndex(piece_index))?;
+
+        // Calculate piece offset within the file
+        let piece_offset_in_file = local_piece_idx as u64 * self.piece_length;
+
+        // Calculate piece length (last piece of file may be smaller)
+        let remaining_in_file = file.length.saturating_sub(piece_offset_in_file);
+        let piece_len = remaining_in_file.min(self.piece_length);
+
+        if piece_len == 0 {
+            return Err(StorageError::InvalidPieceIndex(piece_index));
+        }
+
+        Ok(vec![PieceFileSpan {
+            file_index: file_idx,
+            file_offset: piece_offset_in_file,
+            length: piece_len,
+        }])
+    }
+
     fn block_file_spans(
         &self,
         piece_index: u32,
         offset: u32,
         length: u32,
     ) -> Result<Vec<PieceFileSpan>, StorageError> {
+        // For v2 torrents, use optimized path (blocks never span files)
+        if let Some(ref v2_map) = self.v2_piece_map {
+            return self.block_file_spans_v2(piece_index, offset, length, v2_map);
+        }
+
+        // V1 path: blocks can span files
         let piece = self
             .pieces
             .get(piece_index as usize)
@@ -297,6 +396,51 @@ impl TorrentStorage {
         }
 
         Ok(spans)
+    }
+
+    /// Optimized block-to-file mapping for v2 torrents.
+    ///
+    /// In v2 torrents, blocks never span files since pieces don't span files.
+    fn block_file_spans_v2(
+        &self,
+        piece_index: u32,
+        offset: u32,
+        length: u32,
+        v2_map: &V2PieceMap,
+    ) -> Result<Vec<PieceFileSpan>, StorageError> {
+        // Look up which file this piece belongs to
+        let (file_idx, local_piece_idx) = v2_map
+            .global_to_file(piece_index)
+            .ok_or(StorageError::InvalidPieceIndex(piece_index))?;
+
+        let file = self
+            .files
+            .get(file_idx)
+            .ok_or(StorageError::InvalidPieceIndex(piece_index))?;
+
+        // Calculate piece offset within the file
+        let piece_offset_in_file = local_piece_idx as u64 * self.piece_length;
+
+        // Calculate the actual piece length for this piece
+        let remaining_in_file = file.length.saturating_sub(piece_offset_in_file);
+        let actual_piece_len = remaining_in_file.min(self.piece_length);
+
+        // Validate block bounds
+        if offset as u64 + length as u64 > actual_piece_len {
+            return Err(StorageError::InvalidBlockOffset {
+                piece: piece_index,
+                offset,
+            });
+        }
+
+        // Block offset in file = piece offset + block offset within piece
+        let block_offset_in_file = piece_offset_in_file + offset as u64;
+
+        Ok(vec![PieceFileSpan {
+            file_index: file_idx,
+            file_offset: block_offset_in_file,
+            length: length as u64,
+        }])
     }
 
     fn file_path(&self, file: &FileEntry) -> PathBuf {
@@ -431,22 +575,67 @@ impl TorrentStorage {
         let data = self.read_piece(piece_index).await?;
         let expected_hash = piece.hash.clone();
         let is_v2 = self.is_v2;
+        let piece_length = self.piece_length;
 
-        let hash = tokio::task::spawn_blocking(move || {
+        let valid = tokio::task::spawn_blocking(move || {
             if is_v2 {
-                let mut hasher = Sha256::new();
-                hasher.update(&data);
-                hasher.finalize().to_vec()
+                // For v2, use merkle tree verification with proper padding
+                // The expected_hash is the merkle root of this piece's subtree
+                if expected_hash.len() == 32 {
+                    let mut expected = [0u8; 32];
+                    expected.copy_from_slice(&expected_hash);
+                    verify_piece_layer(&data, &expected, piece_length)
+                } else {
+                    // Fallback for misconfigured piece info
+                    compute_root(&data).to_vec() == expected_hash
+                }
             } else {
                 let mut hasher = Sha1::new();
                 hasher.update(&data);
-                hasher.finalize().to_vec()
+                hasher.finalize().to_vec() == expected_hash
             }
         })
         .await
         .map_err(|e| StorageError::Io(std::io::Error::other(e)))?;
 
-        Ok(hash == expected_hash)
+        Ok(valid)
+    }
+
+    /// Verifies a v2 piece using merkle tree verification.
+    ///
+    /// This is more explicit than `verify_piece` and always uses
+    /// merkle tree verification regardless of the `is_v2` flag.
+    /// It properly handles partial pieces (last piece of a file) by
+    /// padding with zero hashes.
+    pub async fn verify_piece_merkle(
+        &self,
+        piece_index: u32,
+        expected_root: &[u8; 32],
+    ) -> Result<bool, StorageError> {
+        let data = self.read_piece(piece_index).await?;
+        let expected = *expected_root;
+        let piece_length = self.piece_length;
+
+        let valid =
+            tokio::task::spawn_blocking(move || verify_piece_layer(&data, &expected, piece_length))
+                .await
+                .map_err(|e| StorageError::Io(std::io::Error::other(e)))?;
+
+        Ok(valid)
+    }
+
+    /// Gets the expected piece hash for v2 verification.
+    ///
+    /// For v2 torrents, looks up the piece layer hash for the given piece.
+    /// Returns None for v1 torrents or if the piece is not found.
+    pub fn get_v2_piece_hash(&self, piece_index: u32) -> Option<[u8; 32]> {
+        if !self.is_v2 {
+            return None;
+        }
+
+        self.pieces
+            .get(piece_index as usize)
+            .and_then(|p| p.hash_v2())
     }
 
     pub async fn verify_all(&self) -> Result<Vec<bool>, StorageError> {

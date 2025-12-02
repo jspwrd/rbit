@@ -129,6 +129,7 @@ mod connection;
 mod error;
 mod extension;
 mod fast;
+mod hash_request;
 mod message;
 mod metadata;
 mod peer_id;
@@ -137,11 +138,15 @@ mod transport;
 
 pub use bitfield::Bitfield;
 pub use choking::{ChokingAlgorithm, ChokingDecision, ChokingState, PeerStats};
-pub use connection::{PeerConnection, PeerState};
+pub use connection::{PeerConnection, PeerState, ProtocolMode};
 pub use error::PeerError;
 pub use extension::{ExtensionHandshake, ExtensionMessage};
 pub use fast::{generate_allowed_fast_set, FastExtension, FastExtensionState};
-pub use message::{Handshake, Message, MessageId};
+pub use hash_request::{
+    HashRequestKey, HashRequestManager, HashResponse, HashServer, PendingHashRequest,
+    HASH_REQUEST_TIMEOUT, MAX_PENDING_HASH_REQUESTS,
+};
+pub use message::{validate_hash_request, Handshake, Message, MessageId};
 pub use metadata::{
     metadata_piece_count, metadata_piece_size, MetadataMessage, MetadataMessageType,
     METADATA_PIECE_SIZE,

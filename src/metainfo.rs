@@ -28,7 +28,7 @@
 //! println!("Info hash: {}", torrent.info_hash);
 //! println!("Total size: {} bytes", torrent.info.total_length);
 //! println!("Piece length: {} bytes", torrent.info.piece_length);
-//! println!("Number of pieces: {}", torrent.info.pieces.len());
+//! println!("Number of pieces: {}", torrent.info.piece_count());
 //!
 //! // List files in a multi-file torrent
 //! for file in &torrent.info.files {
@@ -113,11 +113,14 @@ mod merkle;
 mod torrent;
 
 pub use error::MetainfoError;
-pub use file_tree::FileTree;
+pub use file_tree::{FileTree, FlattenedFile};
 pub use info_hash::{InfoHash, InfoHashV1, InfoHashV2};
 pub use magnet::MagnetLink;
-pub use merkle::MerkleTree;
-pub use torrent::{File, Info, Metainfo, TorrentVersion};
+pub use merkle::{
+    compute_piece_root, compute_root, extract_layer_hashes, generate_proof_hashes, hash_block,
+    hash_data_blocks, verify_piece, verify_piece_layer, MerkleTree, MERKLE_BLOCK_SIZE,
+};
+pub use torrent::{File, Info, Metainfo, PieceHashes, PieceLayers, TorrentVersion};
 
 #[cfg(test)]
 mod tests;

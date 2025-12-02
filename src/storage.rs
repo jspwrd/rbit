@@ -91,7 +91,7 @@ mod manager;
 
 pub use caching::{CachingDiskManager, MemoryStats, WriteResult};
 pub use error::StorageError;
-pub use file::{AllocationMode, FileEntry, PieceFileSpan, PieceInfo};
+pub use file::{AllocationMode, FileEntry, PieceFileSpan, PieceInfo, V2PieceMap};
 pub use io::{
     coalesce_blocks, FlushRequest, FlushResult, IoQueue, IoWorker, WriteCoalescer, WriteOp,
     WritePriority, WriteRegion,
