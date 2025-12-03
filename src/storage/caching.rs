@@ -3,12 +3,14 @@
 //! This module provides a `CachingDiskManager` that combines disk I/O
 //! with memory caching for efficient piece and block operations.
 
+use std::sync::Arc;
+
+use bytes::Bytes;
+
 use super::error::StorageError;
 use super::io::WriteCoalescer;
 use super::manager::{DiskManager, TorrentStorage};
 use crate::cache::{BlockCache, MemoryBudget, PieceCache};
-use bytes::Bytes;
-use std::sync::Arc;
 
 /// Result of a write operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,5 +1,6 @@
-use super::error::MetainfoError;
 use std::fmt;
+
+use super::error::MetainfoError;
 
 /// A BitTorrent v1 info hash (20-byte SHA1).
 ///

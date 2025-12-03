@@ -1,3 +1,9 @@
+use std::net::SocketAddr;
+use std::time::Instant;
+
+use bytes::Bytes;
+use tokio::net::TcpStream;
+
 use super::bitfield::Bitfield;
 use super::choking::ChokingState;
 use super::error::PeerError;
@@ -5,10 +11,6 @@ use super::extension::ExtensionHandshake;
 use super::message::{validate_hash_request, Handshake, Message};
 use super::peer_id::PeerId;
 use super::transport::PeerTransport;
-use bytes::Bytes;
-use std::net::SocketAddr;
-use std::time::Instant;
-use tokio::net::TcpStream;
 
 /// The connection state of a peer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

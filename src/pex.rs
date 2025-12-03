@@ -46,8 +46,9 @@
 //! [BEP-10]: http://bittorrent.org/beps/bep_0010.html
 //! [BEP-11]: http://bittorrent.org/beps/bep_0011.html
 
-use bytes::{BufMut, Bytes, BytesMut};
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+
+use bytes::{BufMut, Bytes, BytesMut};
 
 /// A peer discovered via Peer Exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

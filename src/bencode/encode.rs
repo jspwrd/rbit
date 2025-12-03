@@ -1,6 +1,7 @@
+use std::io::Write;
+
 use super::error::BencodeError;
 use super::value::Value;
-use std::io::Write;
 
 /// Encodes a bencode value to a byte vector.
 ///

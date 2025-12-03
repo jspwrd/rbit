@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- BEP-19: WebSeed - HTTP/FTP seeding support for downloading from web servers
+- BEP-42: DHT Security Extension - node ID generation and validation based on IP address
+- BEP-55: Holepunch Extension - NAT traversal via UDP hole punching
+
 ## [0.1.2] - 2024-12-01
 
 ### Added

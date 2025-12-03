@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use super::error::MetainfoError;
 use super::info_hash::{InfoHash, InfoHashV1, InfoHashV2};
-use std::collections::HashMap;
 
 /// A parsed magnet link ([BEP-9], [BEP-52]).
 ///

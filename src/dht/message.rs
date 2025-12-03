@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
+use std::net::SocketAddr;
+
+use bytes::Bytes;
+
 use super::error::DhtError;
 use super::node::{Node, NodeId};
 use crate::bencode::{decode, encode, Value};
-use bytes::Bytes;
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
 
 pub type TransactionId = Bytes;
 
@@ -54,6 +56,8 @@ pub struct DhtMessage {
     pub sender_id: Option<NodeId>,
     pub query: Option<(String, DhtQuery)>,
     pub response: Option<DhtResponse>,
+    /// BEP-42: Compact IP + port of the requestor (included in responses)
+    pub ip: Option<Bytes>,
 }
 
 impl DhtMessage {
@@ -63,6 +67,7 @@ impl DhtMessage {
             sender_id: Some(*our_id),
             query: Some(("ping".to_string(), DhtQuery::Ping)),
             response: None,
+            ip: None,
         }
     }
 
@@ -72,6 +77,7 @@ impl DhtMessage {
             sender_id: Some(*our_id),
             query: Some(("find_node".to_string(), DhtQuery::FindNode { target })),
             response: None,
+            ip: None,
         }
     }
 
@@ -81,6 +87,7 @@ impl DhtMessage {
             sender_id: Some(*our_id),
             query: Some(("get_peers".to_string(), DhtQuery::GetPeers { info_hash })),
             response: None,
+            ip: None,
         }
     }
 
@@ -104,6 +111,7 @@ impl DhtMessage {
                 },
             )),
             response: None,
+            ip: None,
         }
     }
 
@@ -228,6 +236,7 @@ impl DhtMessage {
             sender_id,
             query: Some((query_name.to_string(), query)),
             response: None,
+            ip: None,
         })
     }
 
@@ -235,6 +244,11 @@ impl DhtMessage {
         transaction_id: TransactionId,
         dict: &BTreeMap<Bytes, Value>,
     ) -> Result<Self, DhtError> {
+        // BEP-42: Extract top-level "ip" field
+        let ip = dict
+            .get(b"ip".as_slice())
+            .and_then(|v| v.as_bytes())
+            .cloned();
         let resp = dict
             .get(b"r".as_slice())
             .and_then(|v| v.as_dict())
@@ -303,6 +317,7 @@ impl DhtMessage {
             sender_id: Some(sender_id),
             query: None,
             response: Some(response),
+            ip,
         })
     }
 
@@ -328,6 +343,7 @@ impl DhtMessage {
             sender_id: None,
             query: None,
             response: Some(DhtResponse::Error { code, message }),
+            ip: None,
         })
     }
 
@@ -476,6 +492,11 @@ impl DhtMessage {
                     }
 
                     dict.insert(Bytes::from_static(b"r"), Value::Dict(resp));
+
+                    // BEP-42: Include IP field at top level of response
+                    if let Some(ref ip) = self.ip {
+                        dict.insert(Bytes::from_static(b"ip"), Value::Bytes(ip.clone()));
+                    }
                 }
             }
         }

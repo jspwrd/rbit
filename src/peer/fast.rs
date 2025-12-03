@@ -1,6 +1,7 @@
-use sha1::{Digest, Sha1};
 use std::collections::HashSet;
 use std::net::IpAddr;
+
+use sha1::{Digest, Sha1};
 
 const ALLOWED_FAST_SET_SIZE: usize = 10;
 

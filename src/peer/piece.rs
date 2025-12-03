@@ -3,16 +3,18 @@
 //! This module provides types for tracking piece downloads and managing
 //! block requests across multiple peers.
 
-use crate::peer::bitfield::Bitfield;
-use crate::peer::error::PeerError;
-use bytes::Bytes;
-use parking_lot::RwLock;
-use rand::seq::SliceRandom;
 use std::cmp::Ordering as CmpOrdering;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use bytes::Bytes;
+use parking_lot::RwLock;
+use rand::seq::SliceRandom;
+
+use crate::peer::bitfield::Bitfield;
+use crate::peer::error::PeerError;
 
 /// Standard block size (16KB).
 pub const BLOCK_SIZE: u32 = 16384;

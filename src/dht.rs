@@ -74,14 +74,19 @@
 mod error;
 mod message;
 mod node;
+mod node_id_security;
 mod routing;
 mod server;
 
 pub use error::DhtError;
 pub use message::{DhtMessage, DhtQuery, DhtResponse, TransactionId};
 pub use node::{Node, NodeId};
+pub use node_id_security::{
+    decode_compact_ip_port, encode_compact_ip_port, generate_secure_node_id, is_local_network,
+    validate_node_id, BEP42_IPV4_MASK, BEP42_IPV6_MASK, BEP42_REQUIRED_VOTES,
+};
 pub use routing::RoutingTable;
-pub use server::DhtServer;
+pub use server::{Bep42Config, DhtServer};
 
 #[cfg(test)]
 mod tests;

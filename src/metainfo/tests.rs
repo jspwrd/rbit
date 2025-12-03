@@ -273,8 +273,9 @@ fn vb(s: &[u8]) -> bytes::Bytes {
 
 #[test]
 fn test_v2_torrent_structure() {
-    use crate::bencode::{encode, Value};
     use std::collections::BTreeMap;
+
+    use crate::bencode::{encode, Value};
 
     // Create a minimal v2 torrent structure
     let piece_length: i64 = 16384; // Minimum valid v2 piece length
@@ -330,8 +331,9 @@ fn test_v2_torrent_structure() {
 
 #[test]
 fn test_v2_torrent_multi_file() {
-    use crate::bencode::{encode, Value};
     use std::collections::BTreeMap;
+
+    use crate::bencode::{encode, Value};
 
     let piece_length: i64 = 16384;
 
@@ -405,9 +407,11 @@ fn test_v2_torrent_multi_file() {
 
 #[test]
 fn test_hybrid_torrent_structure() {
-    use crate::bencode::{encode, Value};
-    use sha1::{Digest, Sha1};
     use std::collections::BTreeMap;
+
+    use sha1::{Digest, Sha1};
+
+    use crate::bencode::{encode, Value};
 
     let piece_length: i64 = 16384;
     let file_content = vec![0xABu8; piece_length as usize];
@@ -469,8 +473,9 @@ fn test_hybrid_torrent_structure() {
 
 #[test]
 fn test_v2_piece_length_validation() {
-    use crate::bencode::{encode, Value};
     use std::collections::BTreeMap;
+
+    use crate::bencode::{encode, Value};
 
     // Piece length must be power of 2 and >= 16384
     let invalid_lengths = [
@@ -517,8 +522,9 @@ fn test_v2_piece_length_validation() {
 
 #[test]
 fn test_v2_path_traversal_rejection() {
-    use crate::bencode::{encode, Value};
     use std::collections::BTreeMap;
+
+    use crate::bencode::{encode, Value};
 
     // The implementation may or may not reject ".." as a directory name in the file tree.
     // What matters is that the storage layer validates paths before writing.
@@ -572,8 +578,9 @@ fn test_v2_path_traversal_rejection() {
 
 #[test]
 fn test_v2_padding_file_detection() {
-    use crate::bencode::{encode, Value};
     use std::collections::BTreeMap;
+
+    use crate::bencode::{encode, Value};
 
     let piece_length: i64 = 16384;
 
@@ -634,9 +641,11 @@ fn test_v2_padding_file_detection() {
 
 #[test]
 fn test_info_hash_v2_computation() {
-    use crate::bencode::{encode, Value};
-    use sha2::{Digest, Sha256};
     use std::collections::BTreeMap;
+
+    use sha2::{Digest, Sha256};
+
+    use crate::bencode::{encode, Value};
 
     // Create a simple v2 torrent
     let mut file_dict: BTreeMap<bytes::Bytes, Value> = BTreeMap::new();

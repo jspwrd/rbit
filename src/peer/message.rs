@@ -1,5 +1,6 @@
-use super::error::PeerError;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+
+use super::error::PeerError;
 
 /// The BitTorrent protocol identifier.
 pub const PROTOCOL: &[u8] = b"BitTorrent protocol";

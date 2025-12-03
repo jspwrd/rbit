@@ -1,6 +1,8 @@
-use super::*;
-use bytes::Bytes;
 use std::collections::BTreeMap;
+
+use bytes::Bytes;
+
+use super::*;
 
 #[test]
 fn test_decode_integer() {

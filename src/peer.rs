@@ -130,6 +130,7 @@ mod error;
 mod extension;
 mod fast;
 mod hash_request;
+mod holepunch;
 mod message;
 mod metadata;
 mod peer_id;
@@ -145,6 +146,11 @@ pub use fast::{generate_allowed_fast_set, FastExtension, FastExtensionState};
 pub use hash_request::{
     HashRequestKey, HashRequestManager, HashResponse, HashServer, PendingHashRequest,
     HASH_REQUEST_TIMEOUT, MAX_PENDING_HASH_REQUESTS,
+};
+pub use holepunch::{
+    HolepunchAddrType, HolepunchError, HolepunchErrorCode, HolepunchMessage, HolepunchMessageType,
+    HolepunchState, HOLEPUNCH_DEFAULT_EXTENSION_ID, HOLEPUNCH_EXTENSION_NAME,
+    HOLEPUNCH_RETRY_DELAY_SECS, HOLEPUNCH_TIMEOUT_SECS,
 };
 pub use message::{validate_hash_request, Handshake, Message, MessageId};
 pub use metadata::{

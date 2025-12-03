@@ -1,5 +1,6 @@
-use rand::Rng as _;
 use std::fmt;
+
+use rand::Rng as _;
 
 const PEER_ID_PREFIX: &[u8] = b"-RB0001-";
 

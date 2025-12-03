@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
+
+use bytes::Bytes;
+
 use super::error::PeerError;
 use crate::bencode::{decode, encode, Value};
-use bytes::Bytes;
-use std::collections::BTreeMap;
 
 pub const EXTENSION_HANDSHAKE_ID: u8 = 0;
 

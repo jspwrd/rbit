@@ -1,8 +1,0 @@
-BEP-27
-BEP-52
-BEP-29
-BEP-19
-BEP-55
-BEP-42
-
-All BEP documentation can be found here: https://www.bittorrent.org/beps/bep_0000.html

@@ -1,7 +1,9 @@
-use super::node::{Node, NodeId};
-use parking_lot::RwLock;
 use std::collections::VecDeque;
 use std::net::SocketAddr;
+
+use parking_lot::RwLock;
+
+use super::node::{Node, NodeId};
 
 const K: usize = 8;
 const NUM_BUCKETS: usize = 160;

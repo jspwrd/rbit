@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
+
+use bytes::Bytes;
+
 use super::error::BencodeError;
 use super::value::Value;
-use bytes::Bytes;
-use std::collections::BTreeMap;
 
 const MAX_DEPTH: usize = 64;
 

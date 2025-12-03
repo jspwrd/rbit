@@ -190,22 +190,22 @@ pub mod pex;
 pub mod storage;
 pub mod tracker;
 pub mod upnp;
+pub mod webseed;
 
 // Bandwidth limiting
 pub use bandwidth::{BandwidthLimiter, RateLimiter};
-
 // Bencode
 pub use bencode::{decode, encode, BencodeError, Value};
-
 // Caching
 pub use cache::{BlockCache, BufferPool, MemoryBudget, PieceCache};
-
 // DHT
-pub use dht::{DhtError, DhtMessage, DhtServer, Node, NodeId, RoutingTable};
-
+pub use dht::{
+    decode_compact_ip_port, encode_compact_ip_port, generate_secure_node_id, is_local_network,
+    validate_node_id, Bep42Config, DhtError, DhtMessage, DhtServer, Node, NodeId, RoutingTable,
+    BEP42_IPV4_MASK, BEP42_IPV6_MASK, BEP42_REQUIRED_VOTES,
+};
 // LSD
 pub use lsd::{LsdAnnounce, LsdError, LsdService};
-
 // Metainfo
 pub use metainfo::{
     compute_piece_root, compute_root, extract_layer_hashes, generate_proof_hashes, hash_block,
@@ -213,30 +213,33 @@ pub use metainfo::{
     InfoHash, InfoHashV1, InfoHashV2, MagnetLink, MerkleTree, Metainfo, MetainfoError, PieceHashes,
     PieceLayers, TorrentVersion, MERKLE_BLOCK_SIZE,
 };
-
 // Peer
 pub use peer::{
     generate_allowed_fast_set, metadata_piece_count, metadata_piece_size, validate_hash_request,
     Bitfield, Block, BlockRequest, ChokingAlgorithm, ChokingDecision, ExtensionHandshake,
-    FastExtensionState, Handshake, Message, MessageId, MetadataMessage, MetadataMessageType,
-    PeerConnection, PeerError, PeerId, PeerState, PieceManager, ProtocolMode, METADATA_PIECE_SIZE,
+    FastExtensionState, Handshake, HolepunchError, HolepunchErrorCode, HolepunchMessage,
+    HolepunchMessageType, HolepunchState, Message, MessageId, MetadataMessage, MetadataMessageType,
+    PeerConnection, PeerError, PeerId, PeerState, PieceManager, ProtocolMode,
+    HOLEPUNCH_EXTENSION_NAME, METADATA_PIECE_SIZE,
 };
-
 // PEX
 pub use pex::{PexFlags, PexMessage, PexPeer};
-
 // Storage
 pub use storage::{
     coalesce_blocks, AllocationMode, CachingDiskManager, DiskManager, FileEntry, FlushRequest,
     FlushResult, IoQueue, IoWorker, MemoryStats, PieceFileSpan, PieceInfo, StorageError,
     TorrentStorage, V2PieceMap, WriteCoalescer, WriteOp, WritePriority, WriteRegion, WriteResult,
 };
-
 // Tracker
 pub use tracker::{
     AnnounceParams, AnnounceResponse, CompactPeer, HttpTracker, Peer, ScrapeResponse,
     TrackerClient, TrackerError, TrackerEvent, UdpTracker,
 };
-
 // UPnP
 pub use upnp::{PortMapper, PortMapping, Protocol, UpnpError};
+// WebSeed (BEP-19)
+pub use webseed::{
+    FileInfo as WebSeedFileInfo, GapAwarePieceSelector, TorrentInfo as WebSeedTorrentInfo,
+    WebSeedClient, WebSeedError, WEBSEED_CONNECT_TIMEOUT, WEBSEED_GAP_FILL_THRESHOLD,
+    WEBSEED_MAX_RETRIES, WEBSEED_READ_TIMEOUT,
+};

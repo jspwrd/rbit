@@ -1,10 +1,12 @@
-use super::error::PeerError;
-use super::message::{Handshake, Message, HANDSHAKE_LEN};
-use bytes::BytesMut;
 use std::time::Duration;
+
+use bytes::BytesMut;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
+
+use super::error::PeerError;
+use super::message::{Handshake, Message, HANDSHAKE_LEN};
 
 const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
 const READ_TIMEOUT: Duration = Duration::from_secs(120);

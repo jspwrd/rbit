@@ -15,10 +15,11 @@
 //! - **Hashes** (22): Response containing requested hashes plus uncle hashes for verification
 //! - **HashReject** (23): Sent when a peer cannot service a hash request
 
-use bytes::Bytes;
-use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+
+use bytes::Bytes;
+use parking_lot::RwLock;
 
 use crate::metainfo::{extract_layer_hashes, generate_proof_hashes, MerkleTree};
 

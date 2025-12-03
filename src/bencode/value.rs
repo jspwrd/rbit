@@ -1,5 +1,6 @@
-use bytes::Bytes;
 use std::collections::BTreeMap;
+
+use bytes::Bytes;
 
 /// A bencode value.
 ///

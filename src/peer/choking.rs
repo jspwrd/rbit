@@ -1,7 +1,8 @@
-use rand::Rng as _;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
+
+use rand::Rng as _;
 
 const UNCHOKE_INTERVAL: Duration = Duration::from_secs(10);
 const OPTIMISTIC_UNCHOKE_INTERVAL: Duration = Duration::from_secs(30);

@@ -1,8 +1,9 @@
-use bytes::Bytes;
-use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+
+use bytes::Bytes;
+use parking_lot::RwLock;
 
 type CacheKey = (String, u32);
 

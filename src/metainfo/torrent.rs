@@ -1,12 +1,14 @@
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+use bytes::Bytes;
+use sha1::{Digest, Sha1};
+use sha2::Sha256;
+
 use super::error::MetainfoError;
 use super::file_tree::FileTree;
 use super::info_hash::{InfoHash, InfoHashV1, InfoHashV2};
 use crate::bencode::{decode, encode, Value};
-use bytes::Bytes;
-use sha1::{Digest, Sha1};
-use sha2::Sha256;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 /// The version of a torrent file.
 ///
@@ -167,6 +169,8 @@ pub struct Metainfo {
     pub created_by: Option<String>,
     /// The torrent version (V1, V2, or Hybrid).
     pub version: TorrentVersion,
+    /// BEP-19: Web seed URLs for HTTP/FTP seeding.
+    pub url_list: Vec<String>,
     raw_info: Bytes,
 }
 
@@ -543,6 +547,25 @@ impl Metainfo {
             .and_then(|v| v.as_str())
             .map(String::from);
 
+        // BEP-19: Parse url-list for web seeding
+        let url_list = match dict.get(b"url-list".as_slice()) {
+            Some(Value::Bytes(url)) => {
+                // Single URL as string
+                String::from_utf8_lossy(url)
+                    .to_string()
+                    .split_whitespace()
+                    .map(String::from)
+                    .collect()
+            }
+            Some(Value::List(urls)) => {
+                // List of URLs
+                urls.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            }
+            _ => Vec::new(),
+        };
+
         Ok(Self {
             info,
             info_hash,
@@ -552,6 +575,7 @@ impl Metainfo {
             comment,
             created_by,
             version,
+            url_list,
             raw_info,
         })
     }

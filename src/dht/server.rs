@@ -1,18 +1,24 @@
-use super::error::DhtError;
-use super::message::{DhtMessage, DhtQuery, DhtResponse};
-use super::node::{Node, NodeId};
-use super::routing::RoutingTable;
+use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
 use bytes::Bytes;
 use parking_lot::RwLock;
 use sha1::{Digest, Sha1};
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
+
+use super::error::DhtError;
+use super::message::{DhtMessage, DhtQuery, DhtResponse};
+use super::node::{Node, NodeId};
+use super::node_id_security::{
+    decode_compact_ip_port, encode_compact_ip_port, generate_secure_node_id, is_local_network,
+    validate_node_id, BEP42_REQUIRED_VOTES,
+};
+use super::routing::RoutingTable;
 
 const DHT_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_PENDING_QUERIES: usize = 100;
@@ -92,10 +98,20 @@ impl TokenSecrets {
     }
 }
 
+/// Configuration for BEP-42 DHT security extension.
+#[derive(Debug, Clone, Default)]
+pub struct Bep42Config {
+    /// Whether to enforce BEP-42 node ID validation.
+    /// When enabled, nodes with invalid IDs will be rejected.
+    pub enforce: bool,
+    /// External IP address (if known). If None, will be discovered.
+    pub external_ip: Option<IpAddr>,
+}
+
 /// The main DHT server for peer discovery.
 ///
 /// `DhtServer` implements the BitTorrent DHT protocol ([BEP-5]) for finding
-/// peers without relying on trackers.
+/// peers without relying on trackers. Also supports BEP-42 for DHT security.
 ///
 /// # Examples
 ///
@@ -119,30 +135,54 @@ impl TokenSecrets {
 /// [BEP-5]: http://bittorrent.org/beps/bep_0005.html
 pub struct DhtServer {
     socket: Arc<UdpSocket>,
-    our_id: NodeId,
+    our_id: RwLock<NodeId>,
     routing_table: Arc<RoutingTable>,
     pending_queries: Arc<RwLock<HashMap<Bytes, PendingQuery>>>,
     port: u16,
     token_secrets: RwLock<TokenSecrets>,
     peer_store: RwLock<PeerStore>,
+    /// BEP-42: External IP address votes from other nodes
+    external_ip_votes: RwLock<HashMap<IpAddr, u32>>,
+    /// BEP-42: Confirmed external IP address
+    external_ip: RwLock<Option<IpAddr>>,
+    /// BEP-42: Configuration
+    bep42_config: Bep42Config,
 }
 
 impl DhtServer {
+    /// Binds a DHT server to the specified port with default configuration.
     pub async fn bind(port: u16) -> Result<Self, DhtError> {
+        Self::bind_with_config(port, Bep42Config::default()).await
+    }
+
+    /// Binds a DHT server with BEP-42 configuration.
+    ///
+    /// If `config.external_ip` is provided, a BEP-42 compliant node ID will be generated.
+    /// Otherwise, a random node ID is used until external IP is discovered.
+    pub async fn bind_with_config(port: u16, config: Bep42Config) -> Result<Self, DhtError> {
         let socket = UdpSocket::bind(format!("0.0.0.0:{}", port)).await?;
         let local_addr = socket.local_addr()?;
-        let our_id = NodeId::generate();
+
+        // Generate node ID based on external IP if known
+        let our_id = if let Some(ip) = config.external_ip {
+            generate_secure_node_id(ip)
+        } else {
+            NodeId::generate()
+        };
 
         info!("DHT server bound to {} with id {}", local_addr, our_id);
 
         Ok(Self {
             socket: Arc::new(socket),
-            our_id,
+            our_id: RwLock::new(our_id),
             routing_table: Arc::new(RoutingTable::new(our_id)),
             pending_queries: Arc::new(RwLock::new(HashMap::new())),
             port: local_addr.port(),
             token_secrets: RwLock::new(TokenSecrets::new()),
             peer_store: RwLock::new(PeerStore::new()),
+            external_ip_votes: RwLock::new(HashMap::new()),
+            external_ip: RwLock::new(config.external_ip),
+            bep42_config: config,
         })
     }
 
@@ -150,8 +190,47 @@ impl DhtServer {
         self.port
     }
 
-    pub fn our_id(&self) -> &NodeId {
-        &self.our_id
+    /// Returns our current node ID.
+    pub fn our_id(&self) -> NodeId {
+        *self.our_id.read()
+    }
+
+    /// Returns the confirmed external IP address (if known).
+    pub fn external_ip(&self) -> Option<IpAddr> {
+        *self.external_ip.read()
+    }
+
+    /// Returns whether BEP-42 enforcement is enabled.
+    pub fn is_bep42_enforced(&self) -> bool {
+        self.bep42_config.enforce
+    }
+
+    /// Processes an external IP vote from a DHT response.
+    /// When enough votes agree, regenerates our node ID to be BEP-42 compliant.
+    fn process_external_ip_vote(&self, ip: IpAddr) {
+        // Skip if we already have a confirmed external IP
+        if self.external_ip.read().is_some() {
+            return;
+        }
+
+        let mut votes = self.external_ip_votes.write();
+        let count = votes.entry(ip).or_insert(0);
+        *count += 1;
+
+        if *count >= BEP42_REQUIRED_VOTES {
+            // We have consensus on our external IP
+            info!(
+                "BEP-42: External IP confirmed as {} after {} votes",
+                ip, count
+            );
+
+            // Regenerate node ID based on confirmed IP
+            let new_id = generate_secure_node_id(ip);
+            *self.our_id.write() = new_id;
+            *self.external_ip.write() = Some(ip);
+
+            info!("BEP-42: Node ID regenerated to {}", new_id);
+        }
     }
 
     pub fn routing_table(&self) -> &RoutingTable {
@@ -177,7 +256,7 @@ impl DhtServer {
             }
         }
 
-        self.find_node(self.our_id).await?;
+        self.find_node(self.our_id()).await?;
 
         info!(
             "DHT bootstrap complete, {} nodes in routing table",
@@ -188,7 +267,8 @@ impl DhtServer {
 
     pub async fn ping(&self, addr: SocketAddr) -> Result<DhtResponse, DhtError> {
         let tid = self.generate_transaction_id();
-        let msg = DhtMessage::ping(tid.clone(), &self.our_id);
+        let our_id = self.our_id();
+        let msg = DhtMessage::ping(tid.clone(), &our_id);
 
         self.send_query(addr, msg, tid).await
     }
@@ -204,10 +284,11 @@ impl DhtServer {
 
         let nodes_to_query: Vec<_> = closest.iter().take(DHT_ALPHA).cloned().collect();
         let mut queries = Vec::with_capacity(nodes_to_query.len());
+        let our_id = self.our_id();
 
         for node in &nodes_to_query {
             let tid = self.generate_transaction_id();
-            let msg = DhtMessage::find_node(tid.clone(), &self.our_id, target);
+            let msg = DhtMessage::find_node(tid.clone(), &our_id, target);
             queries.push((node.id, self.send_query(node.addr, msg, tid)));
         }
 
@@ -272,7 +353,8 @@ impl DhtServer {
                     nodes_to_query.push(node.clone());
 
                     let tid = self.generate_transaction_id();
-                    let msg = DhtMessage::get_peers(tid.clone(), &self.our_id, info_hash);
+                    let our_id = self.our_id();
+                    let msg = DhtMessage::get_peers(tid.clone(), &our_id, info_hash);
                     queries.push(self.send_query(node.addr, msg, tid));
                 }
             }
@@ -422,7 +504,7 @@ impl DhtServer {
             return NodeId::generate();
         }
 
-        let mut id = self.our_id.0;
+        let mut id = self.our_id().0;
         let byte_idx = bucket_idx / 8;
         let bit_idx = 7 - (bucket_idx % 8);
 
@@ -443,11 +525,32 @@ impl DhtServer {
     }
 
     async fn handle_message(&self, msg: DhtMessage, addr: SocketAddr) {
+        // BEP-42: Validate node ID if enforcement is enabled
         if let Some(id) = msg.sender_id {
-            self.routing_table.add_node(Node::new(id, addr));
+            let should_add = if self.bep42_config.enforce && !is_local_network(&addr.ip()) {
+                validate_node_id(&id, addr.ip())
+            } else {
+                true
+            };
+
+            if should_add {
+                self.routing_table.add_node(Node::new(id, addr));
+            } else {
+                debug!(
+                    "BEP-42: Rejecting node {} from {} - invalid node ID",
+                    id, addr
+                );
+            }
         }
 
-        if let Some(response) = msg.response {
+        if let Some(response) = msg.response.clone() {
+            // BEP-42: Process "ip" field from responses for external IP discovery
+            if let Some(ref ip_data) = msg.ip {
+                if let Some((ip, _port)) = decode_compact_ip_port(ip_data) {
+                    self.process_external_ip_vote(ip);
+                }
+            }
+
             let pending = self.pending_queries.read();
             if let Some(query) = pending.get(&msg.transaction_id) {
                 let _ = query.sender.try_send(response);
@@ -469,12 +572,17 @@ impl DhtServer {
         query: DhtQuery,
         _sender_id: Option<NodeId>,
     ) {
+        let our_id = self.our_id();
+        // BEP-42: Include requestor's IP in response
+        let requester_ip = Bytes::from(encode_compact_ip_port(addr.ip(), addr.port()));
+
         let response = match (name, query) {
             ("ping", _) => DhtMessage {
                 transaction_id: tid,
                 sender_id: None,
                 query: None,
-                response: Some(DhtResponse::Ping { id: self.our_id }),
+                response: Some(DhtResponse::Ping { id: our_id }),
+                ip: Some(requester_ip),
             },
             ("find_node", DhtQuery::FindNode { target }) => {
                 let nodes = self.routing_table.find_closest(&target, 8);
@@ -482,14 +590,12 @@ impl DhtServer {
                     transaction_id: tid,
                     sender_id: None,
                     query: None,
-                    response: Some(DhtResponse::FindNode {
-                        id: self.our_id,
-                        nodes,
-                    }),
+                    response: Some(DhtResponse::FindNode { id: our_id, nodes }),
+                    ip: Some(requester_ip),
                 }
             }
             ("get_peers", DhtQuery::GetPeers { info_hash }) => {
-                let target = NodeId::from_bytes(&info_hash).unwrap_or(self.our_id);
+                let target = NodeId::from_bytes(&info_hash).unwrap_or(our_id);
                 let nodes = self.routing_table.find_closest(&target, 8);
                 let token = self.generate_token(&addr);
 
@@ -505,11 +611,12 @@ impl DhtServer {
                     sender_id: None,
                     query: None,
                     response: Some(DhtResponse::GetPeers {
-                        id: self.our_id,
+                        id: our_id,
                         token,
                         peers,
                         nodes: Some(nodes),
                     }),
+                    ip: Some(requester_ip),
                 }
             }
             (
@@ -531,6 +638,7 @@ impl DhtServer {
                             code: 203,
                             message: "Invalid token".to_string(),
                         }),
+                        ip: Some(requester_ip),
                     }
                 } else {
                     let peer_port = if implied_port { addr.port() } else { port };
@@ -546,7 +654,8 @@ impl DhtServer {
                         transaction_id: tid,
                         sender_id: None,
                         query: None,
-                        response: Some(DhtResponse::AnnouncePeer { id: self.our_id }),
+                        response: Some(DhtResponse::AnnouncePeer { id: our_id }),
+                        ip: Some(requester_ip),
                     }
                 }
             }

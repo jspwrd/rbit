@@ -4,10 +4,12 @@
 //! between peers. This is primarily used for magnet links where the
 //! metadata needs to be fetched from peers.
 
+use std::collections::BTreeMap;
+
+use bytes::Bytes;
+
 use super::error::PeerError;
 use crate::bencode::{decode, encode, Value};
-use bytes::Bytes;
-use std::collections::BTreeMap;
 
 /// The size of a metadata piece (16 KB).
 pub const METADATA_PIECE_SIZE: usize = 16384;

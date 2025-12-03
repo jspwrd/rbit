@@ -1,5 +1,6 @@
-use crate::bencode::BencodeError;
 use thiserror::Error;
+
+use crate::bencode::BencodeError;
 
 /// Errors that can occur when parsing torrent files or magnet links.
 #[derive(Debug, Error)]

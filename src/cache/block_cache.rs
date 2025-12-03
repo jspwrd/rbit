@@ -1,11 +1,12 @@
-use bytes::Bytes;
-use dashmap::DashMap;
-use sha1::{Digest, Sha1};
-use sha2::Sha256;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
+
+use bytes::Bytes;
+use dashmap::DashMap;
+use sha1::{Digest, Sha1};
+use sha2::Sha256;
 
 use crate::metainfo::MerkleTree;
 

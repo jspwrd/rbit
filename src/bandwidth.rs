@@ -21,9 +21,10 @@
 //! # }
 //! ```
 
-use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use parking_lot::Mutex;
 use tokio::sync::Semaphore;
 
 /// A token bucket rate limiter.

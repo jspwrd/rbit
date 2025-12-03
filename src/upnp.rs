@@ -33,14 +33,16 @@
 //! # }
 //! ```
 
+use std::net::{Ipv4Addr, SocketAddrV4};
+
+use thiserror::Error;
+use tokio::net::UdpSocket;
+use tokio::time::timeout;
+
 use crate::constants::{
     NATPMP_PORT, SSDP_MULTICAST, SSDP_PORT, UPNP_DISCOVERY_TIMEOUT, UPNP_REQUEST_TIMEOUT,
     UPNP_SOCKET_READ_TIMEOUT,
 };
-use std::net::{Ipv4Addr, SocketAddrV4};
-use thiserror::Error;
-use tokio::net::UdpSocket;
-use tokio::time::timeout;
 
 /// Errors that can occur during port mapping operations.
 #[derive(Debug, Error)]

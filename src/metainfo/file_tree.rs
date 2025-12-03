@@ -1,9 +1,10 @@
 //! BitTorrent v2 file tree structure (BEP-52).
 
-use super::error::MetainfoError;
-use crate::bencode::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+
+use super::error::MetainfoError;
+use crate::bencode::Value;
 
 /// A file entry in a v2 file tree.
 #[derive(Debug, Clone)]

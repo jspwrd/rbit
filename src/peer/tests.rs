@@ -1,5 +1,6 @@
-use super::*;
 use bytes::Bytes;
+
+use super::*;
 
 #[test]
 fn test_peer_id_generate() {
@@ -416,8 +417,9 @@ fn test_hash_request_manager_store_hashes() {
 
 #[test]
 fn test_hash_response_from_raw() {
-    use super::hash_request::HashResponse;
     use bytes::Bytes;
+
+    use super::hash_request::HashResponse;
 
     let root = [0x12u8; 32];
 
@@ -441,8 +443,9 @@ fn test_hash_response_from_raw() {
 
 #[test]
 fn test_hash_response_from_raw_invalid_length() {
-    use super::hash_request::HashResponse;
     use bytes::Bytes;
+
+    use super::hash_request::HashResponse;
 
     let root = [0x12u8; 32];
 

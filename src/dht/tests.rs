@@ -1,5 +1,6 @@
-use super::*;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+use super::*;
 
 #[test]
 fn test_node_id_generate() {

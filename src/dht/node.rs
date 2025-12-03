@@ -1,8 +1,10 @@
-use super::error::DhtError;
-use rand::Rng as _;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Instant;
+
+use rand::Rng as _;
+
+use super::error::DhtError;
 
 const MAX_FAILURES: u8 = 3;
 

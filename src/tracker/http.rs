@@ -1,8 +1,10 @@
+use std::time::Duration;
+
+use reqwest::Client;
+
 use super::error::TrackerError;
 use super::response::{parse_compact_peers, parse_compact_peers6, AnnounceResponse, TrackerEvent};
 use crate::bencode::decode;
-use reqwest::Client;
-use std::time::Duration;
 
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 

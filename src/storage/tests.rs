@@ -1,6 +1,8 @@
-use super::*;
 use std::path::PathBuf;
+
 use tempfile::TempDir;
+
+use super::*;
 
 fn create_test_storage(temp: &TempDir, piece_length: u64, file_size: u64) -> TorrentStorage {
     let base_path = temp.path().to_path_buf();

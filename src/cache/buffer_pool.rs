@@ -1,6 +1,7 @@
+use std::sync::Arc;
+
 use bytes::BytesMut;
 use crossbeam::queue::ArrayQueue;
-use std::sync::Arc;
 
 pub const BLOCK_SIZE: usize = 16384;
 pub const BUFFER_POOL_BLOCKS: usize = 1024;

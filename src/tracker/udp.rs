@@ -1,10 +1,12 @@
-use super::error::TrackerError;
-use super::response::{parse_compact_peers, AnnounceResponse, TrackerEvent};
-use rand::Rng as _;
 use std::net::SocketAddr;
 use std::time::Duration;
+
+use rand::Rng as _;
 use tokio::net::UdpSocket;
 use tokio::time::timeout;
+
+use super::error::TrackerError;
+use super::response::{parse_compact_peers, AnnounceResponse, TrackerEvent};
 
 const PROTOCOL_ID: u64 = 0x41727101980;
 const ACTION_CONNECT: u32 = 0;
