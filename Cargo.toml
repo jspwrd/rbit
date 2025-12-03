@@ -1,10 +1,10 @@
 [package]
 name = "rbit"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "A BitTorrent library implementing BEP specifications"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/jasper/rbit"
+repository = "https://github.com/jspwrd/rbit"
 documentation = "https://docs.rs/rbit"
 readme = "README.md"
 keywords = ["bittorrent", "torrent", "p2p", "dht", "peer-to-peer"]
