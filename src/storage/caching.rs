@@ -147,9 +147,13 @@ impl CachingDiskManager {
         }
 
         // Piece is complete - verify and write to disk
-        let valid = self
-            .block_cache
-            .finalize_and_verify(info_hash, piece_index, expected_hash);
+        // Use finalize_and_verify_auto which handles both v1 (SHA1) and v2 (merkle) verification
+        let valid = self.block_cache.finalize_and_verify_auto(
+            info_hash,
+            piece_index,
+            expected_hash,
+            piece_length,
+        );
 
         if valid {
             // Get assembled piece data

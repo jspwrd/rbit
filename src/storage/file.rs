@@ -194,4 +194,55 @@ impl V2PieceMap {
     pub fn file_ranges(&self) -> &[(usize, u32, u32)] {
         &self.file_piece_ranges
     }
+
+    /// Builds a list of PieceInfo for v2 torrents from file entries and piece hashes.
+    ///
+    /// This creates PieceInfo entries for each piece across all files, using the
+    /// provided v2 piece hashes (from piece layers or computed from pieces_root).
+    ///
+    /// # Arguments
+    /// * `files` - The file entries (must match the files used to create this map)
+    /// * `piece_hashes` - v2 piece hashes in global piece order (32 bytes each)
+    ///
+    /// # Returns
+    /// A vector of PieceInfo entries with proper offsets and lengths for v2 torrents.
+    /// Returns None if the hash count doesn't match the expected piece count.
+    pub fn build_piece_info(
+        &self,
+        files: &[FileEntry],
+        piece_hashes: &[[u8; 32]],
+    ) -> Option<Vec<PieceInfo>> {
+        if piece_hashes.len() != self.total_pieces as usize {
+            return None;
+        }
+
+        let mut pieces = Vec::with_capacity(self.total_pieces as usize);
+        let mut global_index = 0u32;
+
+        for &(file_idx, _first_global, piece_count) in &self.file_piece_ranges {
+            let file = &files[file_idx];
+
+            for local_idx in 0..piece_count {
+                // Calculate piece offset within file
+                let offset_in_file = local_idx as u64 * self.piece_length;
+
+                // Calculate piece length (last piece of file may be smaller)
+                let remaining = file.length.saturating_sub(offset_in_file);
+                let length = remaining.min(self.piece_length);
+
+                let hash = piece_hashes[global_index as usize];
+
+                pieces.push(PieceInfo::v2(
+                    global_index,
+                    hash,
+                    offset_in_file, // Offset is relative to file in v2
+                    length,
+                ));
+
+                global_index += 1;
+            }
+        }
+
+        Some(pieces)
+    }
 }

@@ -105,6 +105,7 @@
 //! [BEP-9]: http://bittorrent.org/beps/bep_0009.html
 //! [BEP-52]: http://bittorrent.org/beps/bep_0052.html
 
+mod builder;
 mod error;
 mod file_tree;
 mod info_hash;
@@ -112,6 +113,7 @@ mod magnet;
 mod merkle;
 mod torrent;
 
+pub use builder::{TorrentBuilder, DEFAULT_PIECE_LENGTH, MIN_V2_PIECE_LENGTH};
 pub use error::MetainfoError;
 pub use file_tree::{FileTree, FlattenedFile};
 pub use info_hash::{InfoHash, InfoHashV1, InfoHashV2};

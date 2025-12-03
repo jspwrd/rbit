@@ -144,7 +144,7 @@
 //! | [BEP-14](http://bittorrent.org/beps/bep_0014.html) | Local Service Discovery | [`lsd`] |
 //! | [BEP-15](http://bittorrent.org/beps/bep_0015.html) | UDP Tracker Protocol | [`tracker`] |
 //! | [BEP-23](http://bittorrent.org/beps/bep_0023.html) | Compact Peer Lists | [`tracker`] |
-//! | [BEP-52](http://bittorrent.org/beps/bep_0052.html) | BitTorrent v2 (partial) | [`metainfo`] |
+//! | [BEP-52](http://bittorrent.org/beps/bep_0052.html) | BitTorrent v2 | [`metainfo`], [`storage`] |
 //!
 //! ## Module Overview
 //!
@@ -211,7 +211,8 @@ pub use metainfo::{
     compute_piece_root, compute_root, extract_layer_hashes, generate_proof_hashes, hash_block,
     hash_data_blocks, verify_piece, verify_piece_layer, File, FileTree, FlattenedFile, Info,
     InfoHash, InfoHashV1, InfoHashV2, MagnetLink, MerkleTree, Metainfo, MetainfoError, PieceHashes,
-    PieceLayers, TorrentVersion, MERKLE_BLOCK_SIZE,
+    PieceLayers, TorrentBuilder, TorrentVersion, DEFAULT_PIECE_LENGTH, MERKLE_BLOCK_SIZE,
+    MIN_V2_PIECE_LENGTH,
 };
 // Peer
 pub use peer::{
